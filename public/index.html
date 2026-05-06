@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Stock Market Simulator — Learn to trade in a risk-free environment">
+  <title>STOCKSIM // LOGIN</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+</head>
+<body>
+  <div class="app-container auth-page">
+    <div class="auth-container">
+      <div class="auth-header">
+        <div class="auth-logo">[STOCKSIM::v2.0]</div>
+        <h1>ENTER THE MATRIX</h1>
+        <p>// real-time stock market simulation engine</p>
+      </div>
+
+      <div class="auth-card">
+        <div id="auth-message" class="auth-message"></div>
+
+        <form id="login-form">
+          <div class="form-group">
+            <label for="username">USERNAME</label>
+            <input type="text" id="username" class="form-input" placeholder="> enter_username" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label for="password">PASSWORD</label>
+            <input type="password" id="password" class="form-input" placeholder="> ********" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-lg" id="login-btn">
+            [ AUTHENTICATE ]
+          </button>
+        </form>
+      </div>
+
+      <div class="auth-footer">
+        // new participant? <a href="/register">[ REGISTER ]</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const messageEl = document.getElementById('auth-message');
+    const loginBtn = document.getElementById('login-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '<span class="spinner"></span> AUTHENTICATING...';
+      messageEl.className = 'auth-message';
+      messageEl.style.display = 'none';
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          messageEl.className = 'auth-message success';
+          messageEl.textContent = '[ ACCESS GRANTED ] // redirecting...';
+          messageEl.style.display = 'block';
+
+          setTimeout(() => {
+            if (data.user.role === 'admin') {
+              window.location.href = '/admin';
+            } else {
+              window.location.href = '/participant';
+            }
+          }, 500);
+        } else {
+          messageEl.className = 'auth-message error';
+          messageEl.textContent = '[ ACCESS DENIED ] ' + (data.error || 'Authentication failed');
+          messageEl.style.display = 'block';
+        }
+      } catch (err) {
+        messageEl.className = 'auth-message error';
+        messageEl.textContent = '[ CONNECTION ERROR ] // network unreachable';
+        messageEl.style.display = 'block';
+      }
+
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = '[ AUTHENTICATE ]';
+    });
+  </script>
+  <script src="/js/matrix-rain.js"></script>
+</body>
+</html>

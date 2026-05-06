@@ -1,0 +1,10 @@
+node_modules/
+.env
+data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.DS_Store
+cookies.txt
+pcookies.txt

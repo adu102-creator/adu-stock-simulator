@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Participant Trading Dashboard — Stock Market Simulator">
+  <title>STOCKSIM // TRADING</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/holographic.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-container participant-layout" id="app">
+
+    <!-- Waiting Screen -->
+    <div class="waiting-screen" id="waiting-screen" style="display: none;">
+      <div class="icon">[STANDBY]</div>
+      <h2>AWAITING SIMULATION</h2>
+      <p id="waiting-message">// the simulation has not started. please wait for admin initialization.</p>
+    </div>
+
+    <!-- Main Trading Interface -->
+    <div id="trading-interface" style="display: none;">
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <div class="top-bar-left">
+          <div class="top-bar-brand">
+            <h2>[STOCKSIM]</h2>
+          </div>
+          <div class="top-bar-stats">
+            <div class="top-stat">
+              <span class="label">SIM_NAME</span>
+              <span class="value cyan" id="sim-name" style="font-size: 0.75rem;">—</span>
+            </div>
+            <div class="top-stat">
+              <span class="label">CASH</span>
+              <span class="value cyan" id="cash-balance">₹0</span>
+            </div>
+            <div class="top-stat">
+              <span class="label">HOLDINGS</span>
+              <span class="value cyan" id="holdings-value">₹0</span>
+            </div>
+            <div class="top-stat">
+              <span class="label">TOTAL</span>
+              <span class="value" id="total-value">₹0</span>
+            </div>
+            <div class="top-stat">
+              <span class="label">DAY</span>
+              <span class="value cyan" id="current-day">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="top-bar-right">
+          <div id="sim-status-indicator"></div>
+          <div class="user-badge">
+            <div class="user-avatar" id="user-avatar">?</div>
+            <span id="user-name">loading...</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="logout-btn">[ X ]</button>
+        </div>
+      </header>
+
+      <!-- Day Progress -->
+      <div class="day-progress" style="margin: 0;">
+        <div class="fill" id="day-progress-fill" style="width: 0%"></div>
+      </div>
+
+      <!-- News Feed -->
+      <div class="news-feed" id="news-feed-panel">
+        <div class="news-feed-header">
+          <h3>NEWS_FEED <span class="news-count" id="news-count">0</span> <span class="live-indicator" id="live-indicator" style="display:none;"><span class="live-dot"></span>[ LIVE ]</span></h3>
+          <button class="news-toggle" id="news-toggle">COLLAPSE</button>
+        </div>
+        <div id="news-feed-content">
+          <div class="news-empty">// awaiting_headlines — live feed will appear here</div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="stocks-tab" id="tab-btn-stocks">STOCKS</button>
+        <button class="tab-btn" data-tab="portfolio-tab" id="tab-btn-portfolio">PORTFOLIO</button>
+        <button class="tab-btn" data-tab="leaderboard-tab" id="tab-btn-leaderboard">LEADERBOARD</button>
+        <button class="tab-btn" data-tab="archive-tab" id="tab-btn-archive">ARCHIVE</button>
+      </nav>
+
+      <!-- Tab Content: Stocks -->
+      <div class="tab-content active" id="stocks-tab">
+        <div class="stock-grid" id="stock-grid">
+          <div class="empty-state">
+            <p>// loading_stocks...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: Portfolio -->
+      <div class="tab-content" id="portfolio-tab">
+        <h3 class="section-title">YOUR HOLDINGS</h3>
+        <div class="glass-card" style="margin-bottom: 1.5rem;">
+          <div style="overflow-x: auto;">
+            <table class="stocks-table">
+              <thead>
+                <tr>
+                  <th>TICKER</th>
+                  <th>COMPANY</th>
+                  <th>QTY</th>
+                  <th>AVG PRICE</th>
+                  <th>CURRENT</th>
+                  <th>P&L</th>
+                  <th>VALUE</th>
+                </tr>
+              </thead>
+              <tbody id="holdings-table-body">
+                <tr><td colspan="7" class="empty-state"><p>// no holdings — start trading</p></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h3 class="section-title">TRADE LOG</h3>
+        <div class="glass-card">
+          <div style="overflow-x: auto;">
+            <table class="stocks-table">
+              <thead>
+                <tr>
+                  <th>TYPE</th>
+                  <th>TICKER</th>
+                  <th>QTY</th>
+                  <th>PRICE</th>
+                  <th>TOTAL</th>
+                  <th>DAY</th>
+                </tr>
+              </thead>
+              <tbody id="trades-table-body">
+                <tr><td colspan="6" class="empty-state"><p>// no trades executed</p></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: Leaderboard -->
+      <div class="tab-content" id="leaderboard-tab">
+        <div class="glass-card">
+          <h3 class="section-title">LIVE RANKINGS</h3>
+          <div style="overflow-x: auto;">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>RANK</th>
+                  <th>PARTICIPANT</th>
+                  <th>TOTAL VALUE</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-body">
+                <tr><td colspan="3" class="empty-state"><p>// loading...</p></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: Archive & Learning Reports -->
+      <div class="tab-content" id="archive-tab">
+        <h3 class="section-title">SIMULATION ARCHIVES</h3>
+        <div id="participant-archive-list">
+          <div class="empty-state"><p>// no archived simulations</p></div>
+        </div>
+
+        <!-- Report Viewer -->
+        <div id="report-viewer" style="display: none; margin-top: 1.5rem;">
+          <h3 class="section-title" id="report-title">// LEARNING REPORT</h3>
+          <div id="report-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock Detail Modal -->
+  <div class="modal-overlay" id="stock-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>
+          <span class="ticker" id="modal-ticker">—</span>
+          <span id="modal-company-name">—</span>
+        </h2>
+        <button class="modal-close" id="modal-close">[X]</button>
+      </div>
+      <div class="modal-body">
+        <!-- Price Chart -->
+        <div class="chart-container">
+          <canvas id="price-chart"></canvas>
+        </div>
+
+        <!-- Stats -->
+        <div class="stock-detail-stats">
+          <div class="detail-stat">
+            <div class="label">CURRENT</div>
+            <div class="value" id="modal-current-price">—</div>
+          </div>
+          <div class="detail-stat">
+            <div class="label">% CHANGE</div>
+            <div class="value" id="modal-percent-change">—</div>
+          </div>
+          <div class="detail-stat">
+            <div class="label">START</div>
+            <div class="value" id="modal-starting-price">—</div>
+          </div>
+          <div class="detail-stat">
+            <div class="label">HOLDINGS</div>
+            <div class="value" id="modal-holdings">0</div>
+          </div>
+        </div>
+
+        <!-- Trade Panel -->
+        <div class="trade-panel">
+          <div class="trade-input-group">
+            <div class="form-group" style="flex: 1;">
+              <label for="trade-quantity">QUANTITY</label>
+              <input type="number" id="trade-quantity" class="form-input" placeholder="> shares" min="1" value="1">
+            </div>
+          </div>
+          <div class="trade-info">
+            <span>AVAILABLE_CASH</span>
+            <span class="value" id="trade-available-cash">₹0</span>
+          </div>
+          <div class="trade-info">
+            <span>EST_COST</span>
+            <span class="value" id="trade-estimated-cost">₹0</span>
+          </div>
+          <button class="btn btn-success btn-lg" id="btn-buy">[ BUY ]</button>
+          <button class="btn btn-danger btn-lg" id="btn-sell">[ SELL ]</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/js/matrix-rain.js"></script>
+  <script src="/js/holographic-ui.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/participant.js"></script>
+</body>
+</html>

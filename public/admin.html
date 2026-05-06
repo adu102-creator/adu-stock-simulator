@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Admin Mission Control — Stock Market Simulator">
+  <title>STOCKSIM // ADMIN CONTROL</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/holographic.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+</head>
+<body>
+  <div class="app-container admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        <h2>[STOCKSIM]</h2>
+        <span>// admin control</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-panel="simulations" id="nav-simulations">
+          <span class="icon">⚙</span>
+          <span>SIMULATIONS</span>
+        </button>
+        <button class="nav-item" data-panel="stocks" id="nav-stocks">
+          <span class="icon">◈</span>
+          <span>STOCKS</span>
+        </button>
+        <button class="nav-item" data-panel="news" id="nav-news">
+          <span class="icon">▶</span>
+          <span>NEWS</span>
+        </button>
+        <button class="nav-item" data-panel="registrations" id="nav-registrations">
+          <span class="icon">◉</span>
+          <span>USERS</span>
+        </button>
+        <button class="nav-item" data-panel="leaderboard" id="nav-leaderboard">
+          <span class="icon">△</span>
+          <span>LEADERBOARD</span>
+        </button>
+        <button class="nav-item" data-panel="archive" id="nav-archive">
+          <span class="icon">◻</span>
+          <span>ARCHIVE</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-ghost btn-sm" id="logout-btn" style="width:100%;">
+          [ LOGOUT ]
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+
+      <!-- ═══ SIMULATIONS PANEL ═══ -->
+      <div class="panel active" id="panel-simulations">
+        <div class="admin-header">
+          <h1>// SIMULATION MANAGER</h1>
+          <div id="sim-status-badge"></div>
+        </div>
+
+        <!-- Create New Simulation -->
+        <div class="glass-card" style="margin-bottom: 1.5rem;">
+          <h3 class="section-title">+ NEW SIMULATION</h3>
+          <div class="sim-config-form">
+            <div class="form-group">
+              <label for="sim-name">SIMULATION NAME</label>
+              <input type="text" id="sim-name" class="form-input" placeholder="> e.g. Market_Exercise_01" required>
+            </div>
+            <div class="form-group">
+              <label for="sim-total-days">TOTAL DAYS</label>
+              <input type="number" id="sim-total-days" class="form-input" value="5" min="1" max="30" placeholder="5">
+            </div>
+            <div class="form-group">
+              <label for="sim-starting-cash">STARTING CASH</label>
+              <input type="number" id="sim-starting-cash" class="form-input" value="100000" min="1000" step="1000" placeholder="100000">
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btn-create-sim">[ CREATE SIMULATION ]</button>
+        </div>
+
+        <!-- Active Simulation Controls -->
+        <div class="glass-card" id="active-sim-panel" style="margin-bottom: 1.5rem; display: none;">
+          <h3 class="section-title">ACTIVE SIMULATION</h3>
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <span style="font-size: 1rem; color: var(--blue-bright); font-weight: 700;" id="active-sim-name">—</span>
+            <div id="active-sim-status-badge"></div>
+          </div>
+
+          <div class="sim-controls-grid">
+            <div class="sim-stat-card">
+              <div class="stat-label">STATUS</div>
+              <div class="stat-value" id="sim-status-text">—</div>
+            </div>
+            <div class="sim-stat-card">
+              <div class="stat-label">CURRENT DAY</div>
+              <div class="stat-value" id="sim-day-text">—</div>
+            </div>
+            <div class="sim-stat-card">
+              <div class="stat-label">TOTAL DAYS</div>
+              <div class="stat-value" id="sim-total-days-text">—</div>
+            </div>
+            <div class="sim-stat-card">
+              <div class="stat-label">TIME LEFT IN DAY</div>
+              <div class="stat-value" id="sim-time-left">—</div>
+            </div>
+          </div>
+
+          <div class="day-progress">
+            <div class="fill" id="day-progress-fill" style="width: 0%"></div>
+          </div>
+
+          <div class="sim-actions">
+            <button class="btn btn-success btn-lg" id="btn-start-sim" style="display:none;">[ START ]</button>
+            <button class="btn btn-amber btn-lg" id="btn-pause-sim" style="display:none;">[ PAUSE ]</button>
+            <button class="btn btn-primary btn-lg" id="btn-resume-sim" style="display:none;">[ RESUME ]</button>
+            <button class="btn btn-danger btn-lg" id="btn-stop-sim" style="display:none;">[ STOP & ARCHIVE ]</button>
+          </div>
+        </div>
+
+        <!-- Simulation List -->
+        <div class="glass-card">
+          <h3 class="section-title">ALL SIMULATIONS</h3>
+          <div id="sim-list" class="sim-list">
+            <div class="empty-state"><p>// NO SIMULATIONS CREATED</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ STOCKS PANEL ═══ -->
+      <div class="panel" id="panel-stocks">
+        <div class="admin-header">
+          <h1>// STOCK MANAGER</h1>
+        </div>
+
+        <div id="stock-sim-selector" style="margin-bottom: 1rem;">
+          <label style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">SIMULATION:</label>
+          <select id="stock-sim-select" class="form-input" style="max-width: 300px; display: inline-block; margin-left: 0.5rem;"></select>
+        </div>
+
+        <div class="glass-card" style="margin-bottom: 1.5rem;">
+          <h3 class="section-title">+ ADD STOCK</h3>
+          <div class="stock-form-grid">
+            <div class="form-group">
+              <label for="stock-name">COMPANY NAME</label>
+              <input type="text" id="stock-name" class="form-input" placeholder="> Apex_Energy">
+            </div>
+            <div class="form-group">
+              <label for="stock-ticker">TICKER</label>
+              <input type="text" id="stock-ticker" class="form-input" placeholder="> APX" maxlength="6" style="text-transform: uppercase;">
+            </div>
+            <div class="form-group">
+              <label for="stock-industry">INDUSTRY</label>
+              <select id="stock-industry" class="form-input">
+                <option value="">— SELECT —</option>
+                <option value="Technology">Technology</option>
+                <option value="Energy">Energy</option>
+                <option value="Healthcare">Healthcare</option>
+                <option value="Finance">Finance</option>
+                <option value="Consumer Goods">Consumer Goods</option>
+                <option value="Real Estate">Real Estate</option>
+                <option value="Automotive">Automotive</option>
+                <option value="Telecommunications">Telecommunications</option>
+                <option value="Agriculture">Agriculture</option>
+                <option value="Pharmaceuticals">Pharmaceuticals</option>
+                <option value="Media & Entertainment">Media & Entertainment</option>
+                <option value="Defense & Aerospace">Defense & Aerospace</option>
+                <option value="Mining & Metals">Mining & Metals</option>
+                <option value="Logistics & Transport">Logistics & Transport</option>
+                <option value="E-Commerce & Retail">E-Commerce & Retail</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="stock-price">STARTING PRICE</label>
+              <input type="number" id="stock-price" class="form-input" placeholder="> 150.00" min="0.01" step="0.01">
+            </div>
+            <div class="form-group">
+              <label for="stock-volatility">VOLATILITY</label>
+              <select id="stock-volatility" class="form-input">
+                <option value="low">LOW</option>
+                <option value="medium" selected>MEDIUM</option>
+                <option value="high">HIGH</option>
+              </select>
+            </div>
+            <div class="form-group stock-form-actions">
+              <button class="btn btn-primary" id="btn-add-stock">[ ADD STOCK ]</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top: 1rem;">
+            <label for="stock-description">COMPANY DESCRIPTION <span style="color: var(--text-muted); font-weight: 400;">(helps AI analyze news impact)</span></label>
+            <textarea id="stock-description" class="form-input" rows="2" placeholder="> Brief description of what this company does, e.g. 'Leading solar panel manufacturer and renewable energy provider'"></textarea>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <h3 class="section-title">CURRENT STOCKS</h3>
+          <div style="overflow-x: auto;">
+            <table class="stocks-table">
+              <thead>
+                <tr>
+                  <th>TICKER</th>
+                  <th>COMPANY</th>
+                  <th>INDUSTRY</th>
+                  <th>START</th>
+                  <th>CURRENT</th>
+                  <th>VOL</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="stocks-table-body">
+                <tr><td colspan="7" class="empty-state"><p>// SELECT A SIMULATION ABOVE</p></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ NEWS PANEL ═══ -->
+      <div class="panel" id="panel-news">
+        <div class="admin-header">
+          <h1>// NEWS PUBLISHER</h1>
+        </div>
+
+        <div id="news-sim-selector" style="margin-bottom: 1rem;">
+          <label style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">SIMULATION:</label>
+          <select id="news-sim-select" class="form-input" style="max-width: 300px; display: inline-block; margin-left: 0.5rem;"></select>
+        </div>
+
+        <div class="glass-card news-compose">
+          <h3 class="section-title">>_ COMPOSE HEADLINE</h3>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="news-headline">HEADLINE</label>
+            <textarea id="news-headline" class="form-input" placeholder=">_ Government announces new subsidies for renewable energy sector" rows="3"></textarea>
+          </div>
+
+          <!-- AI News Suggestion Generator -->
+          <div class="glass-card" style="background: rgba(138,92,255,0.04); border-color: rgba(138,92,255,0.15); margin-bottom: 1rem; padding: 1rem;">
+            <h4 style="font-size: 0.7rem; color: #8A5CFF; letter-spacing: 0.1em; margin-bottom: 0.75rem;">⚡ AI NEWS GENERATOR <span style="font-weight: 400; color: var(--text-muted);">— generate headline ideas for selected stocks</span></h4>
+
+            <!-- Stock checkboxes -->
+            <div style="margin-bottom: 0.75rem;">
+              <label style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 0.4rem;">TARGET STOCKS:</label>
+              <div id="suggest-stock-checkboxes" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <span style="color: var(--text-muted); font-size: 0.7rem;">// load a simulation to see stocks</span>
+              </div>
+            </div>
+
+            <!-- Sentiment & Strength -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.75rem; align-items: end;">
+              <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;">SENTIMENT</label>
+                <select id="suggest-sentiment" class="form-input" style="font-size: 0.7rem; padding: 0.35rem 0.5rem;">
+                  <option value="positive">↑ POSITIVE</option>
+                  <option value="negative" selected>↓ NEGATIVE</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin: 0;">
+                <label style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;">IMPACT LEVEL</label>
+                <select id="suggest-strength" class="form-input" style="font-size: 0.7rem; padding: 0.35rem 0.5rem;">
+                  <option value="mild">MILD (1-3%)</option>
+                  <option value="moderate" selected>MODERATE (3-6%)</option>
+                  <option value="strong">STRONG (7-12%)</option>
+                </select>
+              </div>
+              <button class="btn btn-sm" id="btn-generate-suggestions" style="background: rgba(138,92,255,0.15); color: #8A5CFF; border: 1px solid rgba(138,92,255,0.3); white-space: nowrap;">[ ⚡ GENERATE ]</button>
+            </div>
+
+            <!-- Suggestions output -->
+            <div id="suggestions-output" style="display: none; margin-top: 0.75rem; border-top: 1px solid rgba(138,92,255,0.1); padding-top: 0.75rem;">
+              <label style="font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 0.4rem;">CLICK A HEADLINE TO USE IT:</label>
+              <div id="suggestions-list"></div>
+            </div>
+          </div>
+
+          <!-- Manual Stock Impact Controls -->
+          <div class="glass-card" style="background: rgba(0,212,255,0.03); border-color: rgba(0,212,255,0.1); margin-bottom: 1rem; padding: 1rem;">
+            <h4 style="font-size: 0.7rem; color: var(--holo-cyan, var(--blue-bright)); letter-spacing: 0.1em; margin-bottom: 0.75rem;">▸ STOCK IMPACT CONTROLS <span style="font-weight: 400; color: var(--text-muted);">— manually assign which stocks this news affects</span></h4>
+            <div id="stock-impact-list" style="margin-bottom: 0.75rem;">
+              <p style="color: var(--text-muted); font-size: 0.7rem;">// load a simulation to see stocks</p>
+            </div>
+            <button class="btn btn-sm btn-ghost" id="btn-add-impact" style="display:none;">[ + ADD IMPACT ROW ]</button>
+          </div>
+
+          <!-- Publishing Mode Toggle -->
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <label style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">MODE:</label>
+            <div style="display: flex; gap: 0;">
+              <button class="btn btn-sm news-mode-btn active" id="mode-publish">PUBLISH_NOW</button>
+              <button class="btn btn-sm btn-ghost news-mode-btn" id="mode-schedule">SCHEDULE</button>
+            </div>
+          </div>
+
+          <!-- Schedule Options (hidden by default) -->
+          <div id="schedule-options" style="display: none; margin-bottom: 1rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+              <div class="form-group">
+                <label for="schedule-day">PUBLISH ON DAY</label>
+                <input type="number" id="schedule-day" class="form-input" placeholder="> 2" min="1" step="1" value="1">
+              </div>
+              <div class="form-group">
+                <label for="schedule-time">TIME IN DAY (%)</label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="range" id="schedule-time" min="0" max="100" step="5" value="50" style="flex: 1;">
+                  <span id="schedule-time-display" style="font-size: 0.75rem; color: var(--text-muted); min-width: 35px;">50%</span>
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.3rem;">
+              > effective_publish_time: DAY <span id="effective-day-display">1.50</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+            <button class="btn btn-ghost" id="btn-analyze-news">[ AI ANALYZE ]</button>
+            <button class="btn btn-primary" id="btn-publish-news">[ PUBLISH ]</button>
+            <button class="btn btn-primary" id="btn-schedule-news" disabled style="display: none;">[ ADD TO QUEUE ]</button>
+          </div>
+
+          <!-- AI Impact Preview — Terminal Output Style -->
+          <div class="news-impact-preview" id="impact-preview">
+            <h4 style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem; letter-spacing: 0.1em;">// AI IMPACT ANALYSIS</h4>
+            <div id="impact-tags"></div>
+            <div id="impact-reasoning"></div>
+            <p id="impact-summary" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;"></p>
+          </div>
+        </div>
+
+        <!-- Scheduled Queue -->
+        <div class="glass-card" style="margin-bottom: 1.5rem;">
+          <h3 class="section-title">SCHEDULED QUEUE <span class="news-count" id="scheduled-count" style="font-size: 0.55rem;">0</span></h3>
+          <div id="scheduled-news-list">
+            <div class="empty-state"><p>// NO SCHEDULED NEWS</p></div>
+          </div>
+        </div>
+
+        <!-- Published Headlines -->
+        <div class="glass-card">
+          <h3 class="section-title">PUBLISHED HEADLINES</h3>
+          <div id="admin-news-list">
+            <div class="empty-state"><p>// NO HEADLINES PUBLISHED</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ REGISTRATIONS PANEL ═══ -->
+      <div class="panel" id="panel-registrations">
+        <div class="admin-header">
+          <h1>// USER MANAGEMENT</h1>
+        </div>
+
+        <div class="reg-grid">
+          <div class="glass-card">
+            <h3 class="section-title">PENDING REGISTRATIONS</h3>
+            <div id="pending-list">
+              <div class="empty-state"><p>// NO PENDING REGISTRATIONS</p></div>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <h3 class="section-title">APPROVED PARTICIPANTS</h3>
+            <div id="approved-list">
+              <div class="empty-state"><p>// NO APPROVED PARTICIPANTS</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ LEADERBOARD PANEL ═══ -->
+      <div class="panel" id="panel-leaderboard">
+        <div class="admin-header">
+          <h1>// LEADERBOARD</h1>
+        </div>
+
+        <div id="lb-sim-selector" style="margin-bottom: 1rem;">
+          <label style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">SIMULATION:</label>
+          <select id="lb-sim-select" class="form-input" style="max-width: 300px; display: inline-block; margin-left: 0.5rem;"></select>
+        </div>
+
+        <div class="glass-card">
+          <div style="overflow-x: auto;">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>RANK</th>
+                  <th>PARTICIPANT</th>
+                  <th>CASH</th>
+                  <th>HOLDINGS</th>
+                  <th>TOTAL</th>
+                </tr>
+              </thead>
+              <tbody id="admin-leaderboard-body">
+                <tr><td colspan="5" class="empty-state"><p>// SELECT A SIMULATION</p></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ ARCHIVE PANEL ═══ -->
+      <div class="panel" id="panel-archive">
+        <div class="admin-header">
+          <h1>// SIMULATION ARCHIVE</h1>
+        </div>
+
+        <div id="archive-list" class="sim-list">
+          <div class="empty-state"><p>// NO ARCHIVED SIMULATIONS</p></div>
+        </div>
+
+        <!-- Archive Detail View -->
+        <div id="archive-detail" style="display: none;">
+          <div class="glass-card" style="margin-bottom: 1.5rem;">
+            <h3 class="section-title" id="archive-detail-title">ARCHIVE DETAIL</h3>
+            <div id="archive-detail-content"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/js/matrix-rain.js"></script>
+  <script src="/js/holographic-ui.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

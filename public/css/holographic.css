@@ -1,0 +1,588 @@
+/* ═══ HOLOGRAPHIC TRADING DESK — CSS Overrides ═══ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap');
+
+/* ─── Updated Variables ─── */
+:root {
+  --holo-cyan: #00D4FF;
+  --holo-mint: #00FFC6;
+  --holo-violet: #8A5CFF;
+  --holo-white: #E0F4FF;
+  --holo-bg: #050a18;
+  --holo-panel: rgba(8, 20, 40, 0.7);
+  --holo-border: rgba(0, 212, 255, 0.15);
+  --holo-glow: 0 0 20px rgba(0, 212, 255, 0.12), 0 0 40px rgba(0, 212, 255, 0.05);
+  --holo-radius: 14px;
+  --holo-transition: 250ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ─── Environment ─── */
+body.holo-environment {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: linear-gradient(160deg, #020810 0%, #0a1628 40%, #050a18 100%);
+}
+body.holo-environment::before {
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  z-index: 1; opacity: 0.5;
+}
+
+/* ─── Holographic Grid ─── */
+.holo-grid-overlay {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.04;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.3) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ─── Scanline Sweep ─── */
+.holo-scanline-sweep {
+  position: fixed; top: 0; left: 0; width: 100%; height: 2px; z-index: 999; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(0,212,255,0.4), transparent);
+  animation: scanSweep 8s linear infinite;
+}
+@keyframes scanSweep { 0%{top:-2px;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:100vh;opacity:0} }
+
+/* ─── Floating Animation ─── */
+@keyframes holoFloat {
+  0%,100% { transform: translateY(0) }
+  50% { transform: translateY(-5px) }
+}
+
+/* ─── Panel Reveal ─── */
+@keyframes holoPanelIn {
+  from { opacity:0; transform: translateY(15px) scale(0.97) }
+  to { opacity:1; transform: translateY(0) scale(1) }
+}
+
+/* ═══ GLASSMORPHIC PANELS ═══ */
+body.holo-environment .glass-card,
+body.holo-environment .holo-panel {
+  background: var(--holo-panel);
+  border: 1px solid var(--holo-border);
+  border-radius: var(--holo-radius);
+  box-shadow: var(--holo-glow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all var(--holo-transition);
+  animation: holoFloat 6s ease-in-out infinite;
+}
+body.holo-environment .glass-card:hover,
+body.holo-environment .holo-panel:hover {
+  border-color: rgba(0,212,255,0.35);
+  box-shadow: 0 0 30px rgba(0,212,255,0.18), 0 0 60px rgba(0,212,255,0.06);
+  transform: translateY(-2px) scale(1.005);
+}
+
+/* ═══ TYPOGRAPHY ═══ */
+body.holo-environment h1, body.holo-environment h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 600;
+  color: var(--holo-white);
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 20px rgba(0,212,255,0.4);
+}
+body.holo-environment h3, body.holo-environment h4 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  color: var(--holo-cyan);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 10px rgba(0,212,255,0.25);
+}
+body.holo-environment .section-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: var(--holo-cyan);
+  text-shadow: 0 0 12px rgba(0,212,255,0.3);
+  border-bottom: 1px solid var(--holo-border);
+  padding-bottom: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+/* ═══ BUTTONS — Capsule Style ═══ */
+body.holo-environment .btn {
+  border-radius: 50px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  border: 1px solid rgba(0,212,255,0.3);
+  background: rgba(0,212,255,0.06);
+  color: var(--holo-cyan);
+  text-shadow: 0 0 8px rgba(0,212,255,0.3);
+  transition: all var(--holo-transition);
+  position: relative; overflow: hidden;
+}
+body.holo-environment .btn::after {
+  content:''; position:absolute; inset:0; border-radius:50px;
+  background: linear-gradient(135deg, rgba(0,212,255,0.1), transparent);
+  opacity:0; transition: opacity 200ms;
+}
+body.holo-environment .btn:hover {
+  border-color: var(--holo-cyan);
+  box-shadow: 0 0 20px rgba(0,212,255,0.25), inset 0 0 20px rgba(0,212,255,0.06);
+  color: #fff;
+  transform: translateY(-1px);
+}
+body.holo-environment .btn:hover::after { opacity:1 }
+body.holo-environment .btn:active {
+  transform: scale(0.97) translateY(0);
+  box-shadow: inset 0 0 20px rgba(0,212,255,0.15);
+}
+body.holo-environment .btn-success, body.holo-environment .btn-buy {
+  border-color: rgba(0,255,198,0.4); color: var(--holo-mint);
+  background: rgba(0,255,198,0.06);
+  text-shadow: 0 0 8px rgba(0,255,198,0.3);
+}
+body.holo-environment .btn-success:hover { border-color: var(--holo-mint); box-shadow: 0 0 25px rgba(0,255,198,0.2); }
+body.holo-environment .btn-danger, body.holo-environment .btn-sell {
+  border-color: rgba(138,92,255,0.4); color: var(--holo-violet);
+  background: rgba(138,92,255,0.06);
+  text-shadow: 0 0 8px rgba(138,92,255,0.3);
+}
+body.holo-environment .btn-danger:hover { border-color: var(--holo-violet); box-shadow: 0 0 25px rgba(138,92,255,0.2); }
+body.holo-environment .btn-primary {
+  border-color: rgba(0,212,255,0.4); color: var(--holo-cyan);
+  background: rgba(0,212,255,0.08);
+}
+body.holo-environment .btn-amber {
+  border-color: rgba(255,180,0,0.4); color: #FFB400;
+  background: rgba(255,180,0,0.06);
+}
+
+/* ═══ FORM INPUTS ═══ */
+body.holo-environment .form-input {
+  border-radius: 10px;
+  background: rgba(5,15,30,0.8);
+  border: 1px solid rgba(0,212,255,0.2);
+  color: var(--holo-white);
+  font-family: 'Inter', sans-serif;
+  transition: all var(--holo-transition);
+  text-shadow: none;
+}
+body.holo-environment .form-input:focus {
+  border-color: var(--holo-cyan);
+  box-shadow: 0 0 15px rgba(0,212,255,0.15), 0 0 30px rgba(0,212,255,0.05);
+  color: #fff;
+}
+body.holo-environment .form-input::placeholder { color: rgba(0,212,255,0.25) }
+body.holo-environment .form-group label {
+  font-family: 'Inter', sans-serif;
+  color: rgba(0,212,255,0.5);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+
+/* ═══ ADMIN SIDEBAR ═══ */
+body.holo-environment .admin-sidebar {
+  background: rgba(5,10,24,0.95);
+  border-right: 1px solid var(--holo-border);
+  backdrop-filter: blur(20px);
+}
+body.holo-environment .sidebar-brand h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  color: var(--holo-cyan);
+  text-shadow: 0 0 15px rgba(0,212,255,0.5);
+}
+body.holo-environment .sidebar-brand span { color: rgba(0,212,255,0.35) }
+body.holo-environment .sidebar-brand { border-bottom-color: var(--holo-border) }
+body.holo-environment .sidebar-footer { border-top-color: var(--holo-border) }
+body.holo-environment .nav-item {
+  font-family: 'Inter', sans-serif;
+  border-radius: 10px;
+  color: rgba(0,212,255,0.4);
+  font-weight: 500;
+  transition: all var(--holo-transition);
+}
+body.holo-environment .nav-item:hover {
+  background: rgba(0,212,255,0.06);
+  color: var(--holo-cyan);
+}
+body.holo-environment .nav-item.active {
+  background: rgba(0,212,255,0.1);
+  color: #fff;
+  border-color: rgba(0,212,255,0.3);
+  box-shadow: 0 0 15px rgba(0,212,255,0.1);
+  text-shadow: 0 0 10px rgba(0,212,255,0.4);
+}
+
+/* ═══ ADMIN MAIN AREA ═══ */
+body.holo-environment .admin-main {
+  background: transparent;
+}
+body.holo-environment .admin-header {
+  border-bottom-color: var(--holo-border);
+}
+body.holo-environment .admin-header h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+}
+body.holo-environment .panel.active {
+  animation: holoPanelIn 0.4s cubic-bezier(0.22,1,0.36,1);
+}
+
+/* ═══ PARTICIPANT TOP BAR ═══ */
+body.holo-environment .top-bar {
+  background: rgba(5,10,24,0.9);
+  border-bottom: 1px solid var(--holo-border);
+  backdrop-filter: blur(20px);
+}
+body.holo-environment .top-bar-brand h2 {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--holo-cyan);
+  text-shadow: 0 0 15px rgba(0,212,255,0.5);
+}
+body.holo-environment .top-stat .label {
+  font-family: 'Inter', sans-serif;
+  color: rgba(0,212,255,0.35);
+}
+body.holo-environment .top-stat .value {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 500;
+}
+body.holo-environment .top-stat .value.cyan { color: var(--holo-cyan) }
+
+/* ═══ TAB NAVIGATION ═══ */
+body.holo-environment .tab-nav {
+  border-bottom: 1px solid var(--holo-border);
+}
+body.holo-environment .tab-btn {
+  font-family: 'Inter', sans-serif;
+  border-radius: 8px 8px 0 0;
+  color: rgba(0,212,255,0.4);
+  transition: all var(--holo-transition);
+}
+body.holo-environment .tab-btn.active {
+  color: #fff;
+  background: rgba(0,212,255,0.08);
+  border-color: var(--holo-border);
+  box-shadow: 0 -3px 15px rgba(0,212,255,0.1);
+  text-shadow: 0 0 10px rgba(0,212,255,0.4);
+}
+
+/* ═══ STOCK CARDS ═══ */
+body.holo-environment .stock-card {
+  background: var(--holo-panel);
+  border: 1px solid var(--holo-border);
+  border-radius: var(--holo-radius);
+  backdrop-filter: blur(12px);
+  transition: all var(--holo-transition);
+  cursor: pointer;
+  animation: holoFloat 5s ease-in-out infinite;
+}
+body.holo-environment .stock-card:nth-child(2n) { animation-delay: -1.5s }
+body.holo-environment .stock-card:nth-child(3n) { animation-delay: -3s }
+body.holo-environment .stock-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  border-color: rgba(0,212,255,0.4);
+  box-shadow: 0 8px 30px rgba(0,212,255,0.15), 0 0 50px rgba(0,212,255,0.05);
+}
+body.holo-environment .stock-card .ticker {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+}
+body.holo-environment .stock-card-price {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.3rem;
+  color: var(--holo-white);
+}
+body.holo-environment .stock-card.positive .stock-card-change {
+  color: var(--holo-mint);
+  text-shadow: 0 0 10px rgba(0,255,198,0.3);
+}
+body.holo-environment .stock-card.negative .stock-card-change {
+  color: var(--holo-violet);
+  text-shadow: 0 0 10px rgba(138,92,255,0.3);
+}
+
+/* ═══ TABLES ═══ */
+body.holo-environment .stocks-table,
+body.holo-environment .leaderboard-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+body.holo-environment .stocks-table th,
+body.holo-environment .leaderboard-table th {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  color: rgba(0,212,255,0.45);
+  border-bottom: 1px solid var(--holo-border);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+}
+body.holo-environment .stocks-table td,
+body.holo-environment .leaderboard-table td {
+  border-bottom: 1px solid rgba(0,212,255,0.06);
+  font-family: 'Inter', sans-serif;
+}
+body.holo-environment .stocks-table tr:hover td,
+body.holo-environment .leaderboard-table tr:hover td {
+  background: rgba(0,212,255,0.03);
+}
+body.holo-environment .leaderboard-value {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--holo-cyan);
+  text-shadow: 0 0 8px rgba(0,212,255,0.25);
+}
+
+/* ═══ RANK BADGES ═══ */
+body.holo-environment .rank-badge.rank-1 {
+  background: linear-gradient(135deg, rgba(0,212,255,0.3), rgba(0,255,198,0.3));
+  box-shadow: 0 0 12px rgba(0,212,255,0.3);
+}
+body.holo-environment .rank-badge.rank-2 {
+  background: linear-gradient(135deg, rgba(138,92,255,0.2), rgba(0,212,255,0.2));
+}
+body.holo-environment .rank-badge.rank-3 {
+  background: rgba(0,212,255,0.1);
+}
+
+/* ═══ NEWS FEED ═══ */
+body.holo-environment .news-feed {
+  background: var(--holo-panel);
+  border: 1px solid var(--holo-border);
+  border-radius: var(--holo-radius);
+  backdrop-filter: blur(12px);
+}
+body.holo-environment .news-item {
+  border-bottom-color: rgba(0,212,255,0.06);
+  transition: all var(--holo-transition);
+}
+body.holo-environment .news-item:hover {
+  background: rgba(0,212,255,0.04);
+}
+body.holo-environment .news-tag.positive {
+  background: rgba(0,255,198,0.1);
+  color: var(--holo-mint);
+  border-color: rgba(0,255,198,0.3);
+  border-radius: 20px;
+}
+body.holo-environment .news-tag.negative {
+  background: rgba(138,92,255,0.1);
+  color: var(--holo-violet);
+  border-color: rgba(138,92,255,0.3);
+  border-radius: 20px;
+}
+
+/* ═══ IMPACT TAGS ═══ */
+body.holo-environment .impact-tag {
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+}
+body.holo-environment .impact-tag.positive {
+  background: rgba(0,255,198,0.1); color: var(--holo-mint);
+  border: 1px solid rgba(0,255,198,0.25);
+}
+body.holo-environment .impact-tag.negative {
+  background: rgba(138,92,255,0.1); color: var(--holo-violet);
+  border: 1px solid rgba(138,92,255,0.25);
+}
+
+/* ═══ STATUS BADGES ═══ */
+body.holo-environment .status-badge {
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+}
+body.holo-environment .status-badge.running {
+  background: rgba(0,255,198,0.1);
+  color: var(--holo-mint);
+  border-color: rgba(0,255,198,0.3);
+}
+body.holo-environment .status-badge.not-started {
+  background: rgba(0,212,255,0.08);
+  color: var(--holo-cyan);
+}
+
+/* ═══ MODAL ═══ */
+body.holo-environment .modal-overlay {
+  background: rgba(2,8,16,0.85);
+  backdrop-filter: blur(8px);
+}
+body.holo-environment .modal {
+  background: rgba(8,20,40,0.95);
+  border: 1px solid var(--holo-border);
+  border-radius: var(--holo-radius);
+  box-shadow: 0 0 50px rgba(0,212,255,0.1), 0 20px 60px rgba(0,0,0,0.5);
+  backdrop-filter: blur(20px);
+}
+body.holo-environment .modal-header h2 {
+  font-family: 'Orbitron', sans-serif;
+}
+body.holo-environment .modal-close {
+  border-radius: 50%;
+}
+
+/* ═══ DAY PROGRESS ═══ */
+body.holo-environment .day-progress {
+  background: rgba(0,212,255,0.06);
+  border-radius: 10px;
+  overflow: hidden;
+}
+body.holo-environment .day-progress .fill {
+  background: linear-gradient(90deg, var(--holo-cyan), var(--holo-mint));
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0,212,255,0.4);
+}
+
+/* ═══ SIM CARDS ═══ */
+body.holo-environment .sim-card {
+  background: var(--holo-panel);
+  border: 1px solid var(--holo-border);
+  border-radius: var(--holo-radius);
+  transition: all var(--holo-transition);
+  backdrop-filter: blur(8px);
+}
+body.holo-environment .sim-card:hover {
+  border-color: rgba(0,212,255,0.3);
+  box-shadow: 0 4px 20px rgba(0,212,255,0.1);
+}
+body.holo-environment .sim-stat-card {
+  background: rgba(0,212,255,0.04);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 10px;
+}
+body.holo-environment .sim-stat-card .stat-value {
+  font-family: 'Orbitron', sans-serif;
+  color: var(--holo-cyan);
+  text-shadow: 0 0 10px rgba(0,212,255,0.3);
+}
+
+/* ═══ TOAST NOTIFICATIONS ═══ */
+body.holo-environment .toast {
+  background: rgba(8,20,40,0.95);
+  border: 1px solid var(--holo-border);
+  border-radius: 12px;
+  backdrop-filter: blur(16px);
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3), 0 0 20px rgba(0,212,255,0.1);
+  animation: toastSlideIn 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes toastSlideIn {
+  from { opacity:0; transform: translateX(30px) scale(0.95) }
+  to { opacity:1; transform: translateX(0) scale(1) }
+}
+
+/* ═══ WAITING SCREEN ═══ */
+body.holo-environment .waiting-screen {
+  font-family: 'Orbitron', sans-serif;
+}
+body.holo-environment .waiting-screen .icon {
+  color: var(--holo-cyan);
+  text-shadow: 0 0 30px rgba(0,212,255,0.5);
+  animation: holoFloat 3s ease-in-out infinite;
+}
+
+/* ═══ INDUSTRY TAG ═══ */
+body.holo-environment .industry-tag {
+  border-radius: 20px;
+  background: rgba(138,92,255,0.1);
+  color: var(--holo-violet);
+  border: 1px solid rgba(138,92,255,0.2);
+  font-family: 'Inter', sans-serif;
+}
+
+/* ═══ VOLATILITY ═══ */
+body.holo-environment .volatility-bar.active {
+  background: var(--holo-cyan);
+  box-shadow: 0 0 6px rgba(0,212,255,0.4);
+}
+
+/* ═══ LIVE INDICATOR ═══ */
+body.holo-environment .live-dot {
+  background: var(--holo-mint);
+  box-shadow: 0 0 8px var(--holo-mint);
+}
+
+/* ═══ EMPTY STATE ═══ */
+body.holo-environment .empty-state p {
+  color: rgba(0,212,255,0.25);
+  font-family: 'Inter', sans-serif;
+}
+
+/* ═══ SCROLLBAR ═══ */
+body.holo-environment::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.2); border-radius:10px }
+body.holo-environment::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.4) }
+
+/* ═══ CHART CONTAINER ═══ */
+body.holo-environment .chart-container {
+  border: 1px solid var(--holo-border);
+  border-radius: var(--holo-radius);
+  background: rgba(5,10,24,0.5);
+  padding: 1rem;
+}
+
+/* ═══ PRICE ANIMATION FLASH ═══ */
+body.holo-environment .price-up { color: var(--holo-mint) !important; text-shadow: 0 0 12px rgba(0,255,198,0.5) !important; transition: all 0.3s }
+body.holo-environment .price-down { color: var(--holo-violet) !important; text-shadow: 0 0 12px rgba(138,92,255,0.5) !important; transition: all 0.3s }
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 768px) {
+  body.holo-environment .admin-sidebar { width: 60px }
+  body.holo-environment .admin-main { margin-left: 60px; padding: 1rem }
+  body.holo-environment .nav-item span:last-child { display: none }
+}
+
+/* ═══ SIMULATION STATUS BANNER ═══ */
+#trading-interface {
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.sim-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1.5rem;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+  animation: bannerSlideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+@keyframes bannerSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sim-status-banner .banner-icon {
+  font-size: 0.65rem;
+}
+.sim-status-banner.idle {
+  background: rgba(0, 212, 255, 0.06);
+  color: rgba(0, 212, 255, 0.7);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+}
+.sim-status-banner.idle .banner-icon { color: var(--holo-cyan, #00D4FF); }
+.sim-status-banner.paused {
+  background: rgba(255, 180, 0, 0.06);
+  color: rgba(255, 180, 0, 0.75);
+  border-bottom: 1px solid rgba(255, 180, 0, 0.12);
+}
+.sim-status-banner.paused .banner-icon { color: #FFB400; }
+.sim-status-banner.stopped {
+  background: rgba(138, 92, 255, 0.06);
+  color: rgba(138, 92, 255, 0.75);
+  border-bottom: 1px solid rgba(138, 92, 255, 0.12);
+}
+.sim-status-banner.stopped .banner-icon { color: var(--holo-violet, #8A5CFF); }
+
+/* ═══ ADDITIONAL STATUS BADGES ═══ */
+body.holo-environment .status-badge.paused {
+  background: rgba(255, 180, 0, 0.1);
+  color: #FFB400;
+  border-color: rgba(255, 180, 0, 0.3);
+}
+body.holo-environment .status-badge.stopped {
+  background: rgba(138, 92, 255, 0.1);
+  color: var(--holo-violet);
+  border-color: rgba(138, 92, 255, 0.3);
+}
+body.holo-environment .status-badge.not-started {
+  background: rgba(0, 212, 255, 0.06);
+  color: rgba(0, 212, 255, 0.6);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+}
