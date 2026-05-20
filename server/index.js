@@ -296,7 +296,7 @@ app.delete('/api/admin/stocks/:id', requireAdmin, async (req, res) => {
 // === News Publisher (per simulation) ===
 app.post('/api/admin/simulations/:simId/news/analyze', requireAdmin, async (req, res) => {
   try {
-    const { headline } = req.body;
+    const { headline, intendedStrength } = req.body;
     if (!headline) {
       return res.status(400).json({ error: 'Headline is required' });
     }
@@ -310,7 +310,7 @@ app.post('/api/admin/simulations/:simId/news/analyze', requireAdmin, async (req,
       description: s.description || ''
     }));
 
-    const analysis = await analyzeHeadline(headline, industries, stockContext);
+    const analysis = await analyzeHeadline(headline, industries, stockContext, intendedStrength || null);
     res.json(analysis);
   } catch (error) {
     console.error('Analysis error:', error);

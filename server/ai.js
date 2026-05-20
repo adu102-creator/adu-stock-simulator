@@ -64,7 +64,7 @@ You MUST respond with ONLY valid JSON — no markdown, no explanation, no code f
 // Build the user prompt with full stock context
 // ============================================================
 
-function buildAnalysisPrompt(headline, availableIndustries, stockContext) {
+function buildAnalysisPrompt(headline, availableIndustries, stockContext, intendedStrength) {
   let stockInfo = '';
   if (stockContext && stockContext.length > 0) {
     stockInfo = '\n\n=== STOCKS IN THIS SIMULATION ===\n' + stockContext.map(s =>
@@ -72,11 +72,17 @@ function buildAnalysisPrompt(headline, availableIndustries, stockContext) {
     ).join('\n');
   }
 
+  let strengthConstraint = '';
+  if (intendedStrength) {
+    strengthConstraint = `\n\n=== STRENGTH CONSTRAINT ===\nThis headline was generated to have a "${intendedStrength}" impact level. You MUST classify the strength as "${intendedStrength}". Do NOT override this classification. The strength has already been calibrated.`;
+  }
+
   return `Analyze this news headline and determine its impact on the stock market simulation.
 
 === AVAILABLE INDUSTRIES ===
 ${availableIndustries.join(', ')}
 ${stockInfo}
+${strengthConstraint}
 
 === NEWS HEADLINE ===
 "${headline}"
@@ -105,11 +111,11 @@ function buildSuggestionPrompt(stocks, sentiment, strength) {
 
 ${stockInfo}
 
-Rules:
-- Headlines must be realistic and could appear in a financial newspaper like The Economic Times or Bloomberg
-- Each headline should clearly affect the listed companies/industries
-- Impact should be ${strength} (${strength === 'mild' ? '1-3%' : strength === 'moderate' ? '3-6%' : '7-12%'} price movement)
+CRITICAL CALIBRATION RULES:
+- Impact MUST be exactly "${strength}" — not higher, not lower
+- ${strength === 'mild' ? 'MILD means routine, everyday news. Examples: "Quarterly results slightly beat expectations", "Minor policy tweak announced". These should cause only 1-3% price movement. Do NOT use dramatic words like "massive", "unprecedented", "crisis", "breakthrough".' : strength === 'moderate' ? 'MODERATE means notable but not extraordinary news. Examples: "Government announces new sector policy", "Major contract secured". These should cause 3-6% price movement. Do NOT use extreme words like "crisis", "collapse", "revolutionary", "game-changing".' : 'STRONG means major, market-shaking events. Examples: "Massive fraud scandal uncovered", "Government unveils transformative stimulus". These should cause 7-12% price movement. Use impactful, dramatic language.'}
 - Sentiment: ${sentiment}
+- Headlines must be realistic and could appear in The Economic Times or Bloomberg
 - Vary the types: government policy, market event, company-specific, global event, regulatory action
 - Make headlines specific and detailed, not generic
 
@@ -120,7 +126,7 @@ Respond with ONLY this JSON: {"headlines": ["headline1", "headline2", "headline3
 // Gemini API Calls
 // ============================================================
 
-async function geminiAnalyze(headline, availableIndustries, stockContext) {
+async function geminiAnalyze(headline, availableIndustries, stockContext, intendedStrength) {
   const genAI = getGeminiClient();
   if (!genAI) return null;
 
@@ -135,7 +141,7 @@ async function geminiAnalyze(headline, availableIndustries, stockContext) {
       }
     });
 
-    const prompt = buildAnalysisPrompt(headline, availableIndustries, stockContext);
+    const prompt = buildAnalysisPrompt(headline, availableIndustries, stockContext, intendedStrength);
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
 
@@ -189,7 +195,7 @@ async function geminiSuggest(stocks, sentiment, strength) {
 // Claude API Calls (Fallback)
 // ============================================================
 
-async function claudeAnalyze(headline, availableIndustries, stockContext) {
+async function claudeAnalyze(headline, availableIndustries, stockContext, intendedStrength) {
   const anthropic = getAnthropicClient();
   if (!anthropic) return null;
 
@@ -206,7 +212,7 @@ async function claudeAnalyze(headline, availableIndustries, stockContext) {
       max_tokens: 2000,
       messages: [{
         role: 'user',
-        content: `${SYSTEM_PROMPT}\n\n${buildAnalysisPrompt(headline, availableIndustries, stockContext)}`
+        content: `${SYSTEM_PROMPT}\n\n${buildAnalysisPrompt(headline, availableIndustries, stockContext, intendedStrength)}`
       }]
     });
 
@@ -253,13 +259,13 @@ async function claudeSuggest(stocks, sentiment, strength) {
 /**
  * Analyze a news headline. Tries Gemini first, then Claude, then keyword fallback.
  */
-async function analyzeHeadline(headline, availableIndustries, stockContext = []) {
+async function analyzeHeadline(headline, availableIndustries, stockContext = [], intendedStrength = null) {
   // 1. Try Gemini (primary)
-  const geminiResult = await geminiAnalyze(headline, availableIndustries, stockContext);
+  const geminiResult = await geminiAnalyze(headline, availableIndustries, stockContext, intendedStrength);
   if (geminiResult) return geminiResult;
 
   // 2. Try Claude (secondary)
-  const claudeResult = await claudeAnalyze(headline, availableIndustries, stockContext);
+  const claudeResult = await claudeAnalyze(headline, availableIndustries, stockContext, intendedStrength);
   if (claudeResult) return claudeResult;
 
   // 3. Keyword fallback (always available)

@@ -414,6 +414,7 @@
   const headlineInput = $('#news-headline');
   const impactPreview = $('#impact-preview');
   const stockImpactList = $('#stock-impact-list');
+  let pendingIntendedStrength = null; // Track strength from suggestion generator
   const addImpactBtn = $('#btn-add-impact');
 
   let publishMode = 'publish';
@@ -483,8 +484,9 @@
       if (data.headlines && data.headlines.length > 0) {
         suggestionsOutput.style.display = 'block';
         suggestionsList.innerHTML = data.headlines.map((h, i) => `
-          <div class="suggestion-item" onclick="document.getElementById('news-headline').value=this.dataset.headline; this.style.borderColor='#8A5CFF'; this.style.background='rgba(138,92,255,0.1)';"
+          <div class="suggestion-item" onclick="document.getElementById('news-headline').value=this.dataset.headline; window._pendingStrength=this.dataset.strength; this.style.borderColor='#8A5CFF'; this.style.background='rgba(138,92,255,0.1)';"
                data-headline="${h.replace(/"/g, '&quot;')}"
+               data-strength="${strength}"
                style="padding:0.5rem 0.75rem; margin-bottom:0.35rem; background:rgba(138,92,255,0.03); border:1px solid rgba(138,92,255,0.1); border-radius:4px; cursor:pointer; font-size:0.72rem; color:var(--text-primary); font-family:'Source Code Pro',monospace; transition:all 0.15s;"
                onmouseover="this.style.borderColor='rgba(138,92,255,0.4)'"
                onmouseout="if(this.style.background!=='rgba(138, 92, 255, 0.1)')this.style.borderColor='rgba(138,92,255,0.1)'">
@@ -607,10 +609,12 @@
     analyzeBtn.innerHTML = '<span class="spinner"></span> ANALYZING...';
 
     try {
+      const intendedStrength = window._pendingStrength || null;
+      window._pendingStrength = null; // Clear after use
       const res = await fetch(`/api/admin/simulations/${simId}/news/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ headline })
+        body: JSON.stringify({ headline, intendedStrength })
       });
       const data = await res.json();
       currentAnalysis = data;
