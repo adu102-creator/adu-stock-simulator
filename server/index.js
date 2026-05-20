@@ -5,7 +5,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
 const path = require('path');
-const { stmts, createUser, verifyPassword, executeTrade, getLeaderboard } = require('./db');
+const { stmts, initDB, createUser, verifyPassword, executeTrade, getLeaderboard } = require('./db');
 const SimulationEngine = require('./simulation');
 const { analyzeHeadline, generateNewsSuggestions } = require('./ai');
 
@@ -40,23 +40,6 @@ io.use((socket, next) => {
 // ─── Initialize Simulation Engine ──────────────────────────────
 const simulation = new SimulationEngine(io);
 
-// Ensure admin user exists
-try {
-  const admin = stmts.getUserByUsername.get(process.env.ADMIN_USERNAME || 'admin');
-  if (!admin) {
-    createUser(
-      process.env.ADMIN_USERNAME || 'admin',
-      'Administrator',
-      'admin@simulator.local',
-      process.env.ADMIN_PASSWORD || 'admin123',
-      'admin'
-    );
-    console.log('✅ Admin user created');
-  }
-} catch (e) {
-  // Admin already exists
-}
-
 // ─── Auth Middleware ────────────────────────────────────────────
 function requireAuth(req, res, next) {
   if (!req.session.userId) {
@@ -72,11 +55,11 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-function requireParticipant(req, res, next) {
+async function requireParticipant(req, res, next) {
   if (!req.session.userId || req.session.role !== 'participant') {
     return res.status(403).json({ error: 'Participant access required' });
   }
-  const user = stmts.getUserById.get(req.session.userId);
+  const user = await stmts.getUserById(req.session.userId);
   if (!user || user.status !== 'approved') {
     return res.status(403).json({ error: 'Account not approved yet' });
   }
@@ -84,21 +67,21 @@ function requireParticipant(req, res, next) {
 }
 
 // ─── Auth Routes ───────────────────────────────────────────────
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, name, email, password } = req.body;
     if (!username || !name || !email || !password) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    if (stmts.getUserByUsername.get(username)) {
+    if (await stmts.getUserByUsername(username)) {
       return res.status(400).json({ error: 'Username already taken' });
     }
-    if (stmts.getUserByEmail.get(email)) {
+    if (await stmts.getUserByEmail(email)) {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    createUser(username, name, email, password, 'participant');
+    await createUser(username, name, email, password, 'participant');
     res.json({ success: true, message: 'Registration submitted — awaiting admin approval' });
   } catch (error) {
     console.error('Registration error:', error);
@@ -106,10 +89,10 @@ app.post('/api/auth/register', (req, res) => {
   }
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = stmts.getUserByUsername.get(username);
+    const user = await stmts.getUserByUsername(username);
 
     if (!user || !verifyPassword(password, user.password_hash)) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -148,11 +131,11 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  const user = stmts.getUserById.get(req.session.userId);
+  const user = await stmts.getUserById(req.session.userId);
   if (!user) {
     return res.status(401).json({ error: 'User not found' });
   }
@@ -169,19 +152,19 @@ app.get('/api/auth/me', (req, res) => {
 // ─── Admin Routes ──────────────────────────────────────────────
 
 // === Simulation Management ===
-app.get('/api/admin/simulations', requireAdmin, (req, res) => {
-  const sims = stmts.getAllSimulations.all();
+app.get('/api/admin/simulations', requireAdmin, async (req, res) => {
+  const sims = await stmts.getAllSimulations();
   res.json(sims);
 });
 
-app.post('/api/admin/simulations', requireAdmin, (req, res) => {
+app.post('/api/admin/simulations', requireAdmin, async (req, res) => {
   try {
     const { name, totalDays, startingCash } = req.body;
     if (!name || !totalDays || !startingCash) {
       return res.status(400).json({ error: 'Name, totalDays, and startingCash are required' });
     }
 
-    const result = stmts.createSimulation.run({
+    const result = await stmts.createSimulation({
       name,
       total_days: parseInt(totalDays),
       starting_cash: parseFloat(startingCash)
@@ -193,57 +176,57 @@ app.post('/api/admin/simulations', requireAdmin, (req, res) => {
   }
 });
 
-app.get('/api/admin/simulations/:id', requireAdmin, (req, res) => {
-  const sim = stmts.getSimulation.get(parseInt(req.params.id));
+app.get('/api/admin/simulations/:id', requireAdmin, async (req, res) => {
+  const sim = await stmts.getSimulation(parseInt(req.params.id));
   if (!sim) return res.status(404).json({ error: 'Simulation not found' });
   res.json(sim);
 });
 
 // Simulation controls
-app.post('/api/admin/simulation/:id/start', requireAdmin, (req, res) => {
-  const result = simulation.start(parseInt(req.params.id));
+app.post('/api/admin/simulation/:id/start', requireAdmin, async (req, res) => {
+  const result = await simulation.start(parseInt(req.params.id));
   res.json(result);
 });
 
-app.post('/api/admin/simulation/:id/pause', requireAdmin, (req, res) => {
-  const result = simulation.pause(parseInt(req.params.id));
+app.post('/api/admin/simulation/:id/pause', requireAdmin, async (req, res) => {
+  const result = await simulation.pause(parseInt(req.params.id));
   res.json(result);
 });
 
-app.post('/api/admin/simulation/:id/resume', requireAdmin, (req, res) => {
-  const result = simulation.resume(parseInt(req.params.id));
+app.post('/api/admin/simulation/:id/resume', requireAdmin, async (req, res) => {
+  const result = await simulation.resume(parseInt(req.params.id));
   res.json(result);
 });
 
-app.post('/api/admin/simulation/:id/stop', requireAdmin, (req, res) => {
-  const result = simulation.stop(parseInt(req.params.id));
+app.post('/api/admin/simulation/:id/stop', requireAdmin, async (req, res) => {
+  const result = await simulation.stop(parseInt(req.params.id));
   res.json(result);
 });
 
-app.get('/api/admin/simulation/state', requireAdmin, (req, res) => {
-  const state = simulation.getState();
+app.get('/api/admin/simulation/state', requireAdmin, async (req, res) => {
+  const state = await simulation.getState();
   res.json(state || { status: 'not_started' });
 });
 
 // === Report Release ===
-app.post('/api/admin/simulation/:id/release-report', requireAdmin, (req, res) => {
+app.post('/api/admin/simulation/:id/release-report', requireAdmin, async (req, res) => {
   try {
     const simId = parseInt(req.params.id);
-    const sim = stmts.getSimulation.get(simId);
+    const sim = await stmts.getSimulation(simId);
     if (!sim) return res.status(404).json({ error: 'Simulation not found' });
     if (sim.status !== 'stopped') return res.status(400).json({ error: 'Simulation must be stopped to release report' });
 
-    const { targetUserIds } = req.body; // optional array of user IDs
+    const { targetUserIds } = req.body;
 
     if (targetUserIds && Array.isArray(targetUserIds)) {
       for (const uid of targetUserIds) {
-        stmts.setParticipantReportVisible.run(1, simId, uid);
+        await stmts.setParticipantReportVisible(1, simId, uid);
       }
     } else {
-      stmts.setAllParticipantsReportVisible.run(simId);
+      await stmts.setAllParticipantsReportVisible(simId);
     }
 
-    stmts.releaseReport.run(new Date().toISOString(), simId);
+    await stmts.releaseReport(new Date().toISOString(), simId);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -251,12 +234,12 @@ app.post('/api/admin/simulation/:id/release-report', requireAdmin, (req, res) =>
 });
 
 // === Stock Management (per simulation) ===
-app.get('/api/admin/simulations/:simId/stocks', requireAdmin, (req, res) => {
-  const stocks = stmts.getSimStocks.all(parseInt(req.params.simId));
+app.get('/api/admin/simulations/:simId/stocks', requireAdmin, async (req, res) => {
+  const stocks = await stmts.getSimStocks(parseInt(req.params.simId));
   res.json(stocks);
 });
 
-app.post('/api/admin/simulations/:simId/stocks', requireAdmin, (req, res) => {
+app.post('/api/admin/simulations/:simId/stocks', requireAdmin, async (req, res) => {
   try {
     const simId = parseInt(req.params.simId);
     const { name, ticker, industry, description, startingPrice, volatility } = req.body;
@@ -264,7 +247,7 @@ app.post('/api/admin/simulations/:simId/stocks', requireAdmin, (req, res) => {
       return res.status(400).json({ error: 'All stock fields are required' });
     }
 
-    const sim = stmts.getSimulation.get(simId);
+    const sim = await stmts.getSimulation(simId);
     if (!sim) return res.status(404).json({ error: 'Simulation not found' });
     if (sim.status === 'running') {
       return res.status(400).json({ error: 'Cannot add stocks while simulation is running' });
@@ -273,10 +256,10 @@ app.post('/api/admin/simulations/:simId/stocks', requireAdmin, (req, res) => {
       return res.status(400).json({ error: 'Cannot modify archived simulation' });
     }
 
-    // Get current stock count for color assignment
-    const { count } = stmts.getStockCount.get(simId);
+    const countRow = await stmts.getStockCount(simId);
+    const count = countRow ? countRow.count : 0;
 
-    const result = stmts.createStock.run({
+    const result = await stmts.createStock({
       simulation_id: simId,
       name,
       ticker: ticker.toUpperCase(),
@@ -290,16 +273,16 @@ app.post('/api/admin/simulations/:simId/stocks', requireAdmin, (req, res) => {
 
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (error) {
-    if (error.message.includes('UNIQUE')) {
+    if (error.message && error.message.includes('unique')) {
       return res.status(400).json({ error: 'Ticker symbol already exists in this simulation' });
     }
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete('/api/admin/stocks/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/stocks/:id', requireAdmin, async (req, res) => {
   try {
-    stmts.deleteStock.run(parseInt(req.params.id));
+    await stmts.deleteStock(parseInt(req.params.id));
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -314,9 +297,8 @@ app.post('/api/admin/simulations/:simId/news/analyze', requireAdmin, async (req,
       return res.status(400).json({ error: 'Headline is required' });
     }
 
-    const stocks = stmts.getSimStocks.all(parseInt(req.params.simId));
+    const stocks = await stmts.getSimStocks(parseInt(req.params.simId));
     const industries = [...new Set(stocks.map(s => s.industry))];
-    // Build detailed stock context for smarter AI analysis
     const stockContext = stocks.map(s => ({
       ticker: s.ticker,
       name: s.name,
@@ -339,7 +321,7 @@ app.post('/api/admin/simulations/:simId/news/suggest', requireAdmin, async (req,
       return res.status(400).json({ error: 'Select at least one stock' });
     }
 
-    const allStocks = stmts.getSimStocks.all(parseInt(req.params.simId));
+    const allStocks = await stmts.getSimStocks(parseInt(req.params.simId));
     const selected = allStocks.filter(s => stockIds.includes(s.id));
     if (selected.length === 0) {
       return res.status(400).json({ error: 'No matching stocks found' });
@@ -353,11 +335,11 @@ app.post('/api/admin/simulations/:simId/news/suggest', requireAdmin, async (req,
   }
 });
 
-app.post('/api/admin/simulations/:simId/news/publish', requireAdmin, (req, res) => {
+app.post('/api/admin/simulations/:simId/news/publish', requireAdmin, async (req, res) => {
   try {
     const simId = parseInt(req.params.simId);
     const { headline, impacts, summary, reasoning, smartInvestorAction } = req.body;
-    const state = simulation.getState(simId);
+    const state = await simulation.getState(simId);
 
     if (!state || state.status !== 'running') {
       return res.status(400).json({ error: 'Simulation must be running to publish news' });
@@ -365,14 +347,13 @@ app.post('/api/admin/simulations/:simId/news/publish', requireAdmin, (req, res) 
 
     const simDay = state.simDay;
 
-    // Build reasoning text
     const fullReasoning = JSON.stringify({
       summary: summary || '',
       smartInvestorAction: smartInvestorAction || '',
       impactDetails: impacts || []
     });
 
-    stmts.addNews.run(
+    await stmts.addNews(
       simId,
       headline,
       JSON.stringify({ impacts, summary }),
@@ -380,12 +361,10 @@ app.post('/api/admin/simulations/:simId/news/publish', requireAdmin, (req, res) 
       simDay
     );
 
-    // Apply price impacts
     if (impacts && impacts.length > 0) {
-      simulation.applyNewsImpact(impacts, simId);
+      await simulation.applyNewsImpact(impacts, simId);
     }
 
-    // Broadcast to all participants (hide impact details)
     const broadcastItem = {
       headline,
       sim_day: Math.round(simDay * 100) / 100,
@@ -393,8 +372,6 @@ app.post('/api/admin/simulations/:simId/news/publish', requireAdmin, (req, res) 
     };
 
     io.emit('news:published', broadcastItem);
-
-    // Return full data to admin only
     res.json({ success: true, newsItem: { ...broadcastItem, impacts, summary } });
   } catch (error) {
     console.error('Publish error:', error);
@@ -402,7 +379,7 @@ app.post('/api/admin/simulations/:simId/news/publish', requireAdmin, (req, res) 
   }
 });
 
-app.post('/api/admin/simulations/:simId/news/schedule', requireAdmin, (req, res) => {
+app.post('/api/admin/simulations/:simId/news/schedule', requireAdmin, async (req, res) => {
   try {
     const simId = parseInt(req.params.simId);
     const { headline, impacts, summary, reasoning, smartInvestorAction, scheduledDay } = req.body;
@@ -421,7 +398,7 @@ app.post('/api/admin/simulations/:simId/news/schedule', requireAdmin, (req, res)
       impactDetails: impacts || []
     });
 
-    stmts.addScheduledNews.run(
+    await stmts.addScheduledNews(
       simId,
       headline,
       JSON.stringify({ impacts, summary }),
@@ -437,9 +414,9 @@ app.post('/api/admin/simulations/:simId/news/schedule', requireAdmin, (req, res)
   }
 });
 
-app.get('/api/admin/simulations/:simId/news/scheduled', requireAdmin, (req, res) => {
+app.get('/api/admin/simulations/:simId/news/scheduled', requireAdmin, async (req, res) => {
   try {
-    const scheduled = stmts.getScheduledSimNews.all(parseInt(req.params.simId));
+    const scheduled = await stmts.getScheduledSimNews(parseInt(req.params.simId));
     res.json(scheduled.map(n => ({
       ...n,
       impacts: JSON.parse(n.impacts)
@@ -449,9 +426,9 @@ app.get('/api/admin/simulations/:simId/news/scheduled', requireAdmin, (req, res)
   }
 });
 
-app.get('/api/admin/simulations/:simId/news', requireAdmin, (req, res) => {
+app.get('/api/admin/simulations/:simId/news', requireAdmin, async (req, res) => {
   try {
-    const news = stmts.getSimNews.all(parseInt(req.params.simId));
+    const news = await stmts.getSimNews(parseInt(req.params.simId));
     res.json(news.map(n => ({
       ...n,
       impacts: JSON.parse(n.impacts)
@@ -461,9 +438,9 @@ app.get('/api/admin/simulations/:simId/news', requireAdmin, (req, res) => {
   }
 });
 
-app.delete('/api/admin/news/scheduled/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/news/scheduled/:id', requireAdmin, async (req, res) => {
   try {
-    const result = stmts.deleteScheduledNews.run(parseInt(req.params.id));
+    const result = await stmts.deleteScheduledNews(parseInt(req.params.id));
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Scheduled news item not found or already published' });
     }
@@ -474,39 +451,39 @@ app.delete('/api/admin/news/scheduled/:id', requireAdmin, (req, res) => {
 });
 
 // === Registration Management ===
-app.get('/api/admin/registrations', requireAdmin, (req, res) => {
-  const pending = stmts.getPendingUsers.all();
-  const approved = stmts.getApprovedUsers.all();
-  const all = stmts.getAllParticipants.all();
+app.get('/api/admin/registrations', requireAdmin, async (req, res) => {
+  const pending = await stmts.getPendingUsers();
+  const approved = await stmts.getApprovedUsers();
+  const all = await stmts.getAllParticipants();
   res.json({ pending, approved, all });
 });
 
-app.post('/api/admin/registrations/:id/approve', requireAdmin, (req, res) => {
-  stmts.approveUser.run(parseInt(req.params.id));
+app.post('/api/admin/registrations/:id/approve', requireAdmin, async (req, res) => {
+  await stmts.approveUser(parseInt(req.params.id));
   io.emit('registration:approved', { userId: parseInt(req.params.id) });
   res.json({ success: true });
 });
 
-app.post('/api/admin/registrations/:id/reject', requireAdmin, (req, res) => {
-  stmts.rejectUser.run(parseInt(req.params.id));
+app.post('/api/admin/registrations/:id/reject', requireAdmin, async (req, res) => {
+  await stmts.rejectUser(parseInt(req.params.id));
   res.json({ success: true });
 });
 
 // === Leaderboard (per simulation) ===
-app.get('/api/admin/simulations/:simId/leaderboard', requireAdmin, (req, res) => {
-  res.json(getLeaderboard(parseInt(req.params.simId)));
+app.get('/api/admin/simulations/:simId/leaderboard', requireAdmin, async (req, res) => {
+  res.json(await getLeaderboard(parseInt(req.params.simId)));
 });
 
 // === Archive: simulation report data ===
-app.get('/api/admin/simulations/:simId/report', requireAdmin, (req, res) => {
+app.get('/api/admin/simulations/:simId/report', requireAdmin, async (req, res) => {
   try {
     const simId = parseInt(req.params.simId);
-    const sim = stmts.getSimulation.get(simId);
+    const sim = await stmts.getSimulation(simId);
     if (!sim) return res.status(404).json({ error: 'Simulation not found' });
 
-    const allNews = stmts.getAllSimNews.all(simId);
-    const stocks = stmts.getSimStocks.all(simId);
-    const leaderboard = getLeaderboard(simId);
+    const allNews = await stmts.getAllSimNews(simId);
+    const stocks = await stmts.getSimStocks(simId);
+    const leaderboard = await getLeaderboard(simId);
 
     res.json({
       simulation: sim,
@@ -525,12 +502,11 @@ app.get('/api/admin/simulations/:simId/report', requireAdmin, (req, res) => {
 
 // ─── Participant Routes ────────────────────────────────────────
 
-app.get('/api/participant/simulation', requireParticipant, (req, res) => {
-  const state = simulation.getState();
+app.get('/api/participant/simulation', requireParticipant, async (req, res) => {
+  const state = await simulation.getState();
   if (!state) return res.json({ status: 'not_started' });
 
-  // Get participant data for this simulation
-  const sp = stmts.getParticipant.get(state.id, req.session.userId);
+  const sp = await stmts.getParticipant(state.id, req.session.userId);
   res.json({
     ...state,
     participantCash: sp ? sp.cash : 0,
@@ -538,15 +514,15 @@ app.get('/api/participant/simulation', requireParticipant, (req, res) => {
   });
 });
 
-app.get('/api/participant/portfolio', requireParticipant, (req, res) => {
-  const state = simulation.getState();
+app.get('/api/participant/portfolio', requireParticipant, async (req, res) => {
+  const state = await simulation.getState();
   if (!state || !state.id) return res.json({ cash: 0, holdings: [], trades: [], totalValue: 0 });
 
-  const sp = stmts.getParticipant.get(state.id, req.session.userId);
+  const sp = await stmts.getParticipant(state.id, req.session.userId);
   if (!sp) return res.json({ cash: 0, holdings: [], trades: [], totalValue: 0 });
 
-  const holdings = stmts.getUserSimHoldings.all(req.session.userId, state.id);
-  const trades = stmts.getUserSimTrades.all(req.session.userId, state.id);
+  const holdings = await stmts.getUserSimHoldings(req.session.userId, state.id);
+  const trades = await stmts.getUserSimTrades(req.session.userId, state.id);
 
   let holdingsValue = 0;
   holdings.forEach(h => { holdingsValue += h.quantity * h.current_price; });
@@ -559,23 +535,23 @@ app.get('/api/participant/portfolio', requireParticipant, (req, res) => {
   });
 });
 
-app.get('/api/participant/stocks', requireParticipant, (req, res) => {
-  const state = simulation.getState();
+app.get('/api/participant/stocks', requireParticipant, async (req, res) => {
+  const state = await simulation.getState();
   if (!state || !state.id) return res.json({ stocks: [], simState: { status: 'not_started' } });
 
-  const stocks = stmts.getSimStocks.all(state.id);
+  const stocks = await stmts.getSimStocks(state.id);
   res.json({ stocks, simState: state });
 });
 
-app.get('/api/participant/stocks/:id/history', requireParticipant, (req, res) => {
-  const history = stmts.getPriceHistory.all(parseInt(req.params.id));
+app.get('/api/participant/stocks/:id/history', requireParticipant, async (req, res) => {
+  const history = await stmts.getPriceHistory(parseInt(req.params.id));
   res.json(history);
 });
 
-app.post('/api/participant/trade', requireParticipant, (req, res) => {
+app.post('/api/participant/trade', requireParticipant, async (req, res) => {
   try {
     const { stockId, type, quantity } = req.body;
-    const state = simulation.getState();
+    const state = await simulation.getState();
 
     if (!state || state.status !== 'running') {
       return res.status(400).json({ error: 'Trading is only available while simulation is running' });
@@ -585,7 +561,7 @@ app.post('/api/participant/trade', requireParticipant, (req, res) => {
       return res.status(400).json({ error: 'stockId, type, and quantity are required' });
     }
 
-    const result = executeTrade(
+    const result = await executeTrade(
       req.session.userId,
       parseInt(stockId),
       state.id,
@@ -601,11 +577,11 @@ app.post('/api/participant/trade', requireParticipant, (req, res) => {
   }
 });
 
-app.get('/api/participant/news', requireParticipant, (req, res) => {
-  const state = simulation.getState();
+app.get('/api/participant/news', requireParticipant, async (req, res) => {
+  const state = await simulation.getState();
   if (!state || !state.id) return res.json([]);
 
-  const news = stmts.getSimNews.all(state.id);
+  const news = await stmts.getSimNews(state.id);
   res.json(news.map(n => ({
     id: n.id,
     headline: n.headline,
@@ -614,46 +590,45 @@ app.get('/api/participant/news', requireParticipant, (req, res) => {
   })));
 });
 
-app.get('/api/participant/leaderboard', requireParticipant, (req, res) => {
-  const state = simulation.getState();
+app.get('/api/participant/leaderboard', requireParticipant, async (req, res) => {
+  const state = await simulation.getState();
   if (!state || !state.id) return res.json([]);
-  res.json(getLeaderboard(state.id));
+  res.json(await getLeaderboard(state.id));
 });
 
 // === Participant Archive ===
-app.get('/api/participant/archives', requireParticipant, (req, res) => {
+app.get('/api/participant/archives', requireParticipant, async (req, res) => {
   try {
-    const archivedSims = stmts.getArchivedSimulations.all();
-    // Only return sims where this user was a participant
-    const userSims = archivedSims.filter(sim => {
-      const sp = stmts.getParticipant.get(sim.id, req.session.userId);
-      return !!sp;
-    }).map(sim => {
-      const sp = stmts.getParticipant.get(sim.id, req.session.userId);
-      return {
-        ...sim,
-        reportVisible: sp ? sp.report_visible : 0
-      };
-    });
+    const archivedSims = await stmts.getArchivedSimulations();
+    const userSims = [];
+    for (const sim of archivedSims) {
+      const sp = await stmts.getParticipant(sim.id, req.session.userId);
+      if (sp) {
+        userSims.push({
+          ...sim,
+          reportVisible: sp.report_visible
+        });
+      }
+    }
     res.json(userSims);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/participant/archives/:simId/report', requireParticipant, (req, res) => {
+app.get('/api/participant/archives/:simId/report', requireParticipant, async (req, res) => {
   try {
     const simId = parseInt(req.params.simId);
-    const sim = stmts.getSimulation.get(simId);
+    const sim = await stmts.getSimulation(simId);
     if (!sim || sim.status !== 'stopped') return res.status(404).json({ error: 'Archive not found' });
 
-    const sp = stmts.getParticipant.get(simId, req.session.userId);
+    const sp = await stmts.getParticipant(simId, req.session.userId);
     if (!sp) return res.status(403).json({ error: 'You were not part of this simulation' });
     if (!sp.report_visible) return res.status(403).json({ error: 'Report not yet released by admin' });
 
-    const allNews = stmts.getAllSimNews.all(simId);
-    const stocks = stmts.getSimStocks.all(simId);
-    const leaderboard = getLeaderboard(simId);
+    const allNews = await stmts.getAllSimNews(simId);
+    const stocks = await stmts.getSimStocks(simId);
+    const leaderboard = await getLeaderboard(simId);
 
     res.json({
       simulation: sim,
@@ -670,19 +645,19 @@ app.get('/api/participant/archives/:simId/report', requireParticipant, (req, res
   }
 });
 
-app.get('/api/participant/archives/:simId/leaderboard', requireParticipant, (req, res) => {
+app.get('/api/participant/archives/:simId/leaderboard', requireParticipant, async (req, res) => {
   try {
     const simId = parseInt(req.params.simId);
-    const sp = stmts.getParticipant.get(simId, req.session.userId);
+    const sp = await stmts.getParticipant(simId, req.session.userId);
     if (!sp) return res.status(403).json({ error: 'Not part of this simulation' });
-    res.json(getLeaderboard(simId));
+    res.json(await getLeaderboard(simId));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // ─── Socket.IO Connections ─────────────────────────────────────
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   const session = socket.request.session;
 
   if (session && session.userId) {
@@ -695,12 +670,12 @@ io.on('connection', (socket) => {
   }
 
   // Send current state on connect
-  const state = simulation.getState();
+  const state = await simulation.getState();
   socket.emit('simulation:state', state || { status: 'not_started' });
 
   // Send current stock prices if active sim
   if (state && state.id) {
-    const stocks = stmts.getSimStocks.all(state.id);
+    const stocks = await stmts.getSimStocks(state.id);
     socket.emit('prices:update', stocks.map(s => ({
       id: s.id,
       ticker: s.ticker,
@@ -732,8 +707,29 @@ app.get('/register', (req, res) => {
 });
 
 // ─── Start Server ──────────────────────────────────────────────
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`
+async function startServer() {
+  // Initialize database tables
+  await initDB();
+
+  // Ensure admin user exists
+  try {
+    const admin = await stmts.getUserByUsername(process.env.ADMIN_USERNAME || 'admin');
+    if (!admin) {
+      await createUser(
+        process.env.ADMIN_USERNAME || 'admin',
+        'Administrator',
+        'admin@simulator.local',
+        process.env.ADMIN_PASSWORD || 'admin123',
+        'admin'
+      );
+      console.log('✅ Admin user created');
+    }
+  } catch (e) {
+    console.error('Admin init error:', e.message);
+  }
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`
   ╔══════════════════════════════════════════════╗
   ║     📈 Stock Market Simulator Running       ║
   ║                                              ║
@@ -741,8 +737,14 @@ server.listen(PORT, '0.0.0.0', () => {
   ║  👤 Admin: ${(process.env.ADMIN_USERNAME || 'admin').padEnd(30)}║
   ║  🔑 Password: ${(process.env.ADMIN_PASSWORD || 'admin123').padEnd(27)}║
   ╚══════════════════════════════════════════════╝
-  `);
+    `);
 
-  // Recover simulation state if needed
-  simulation.recover();
+    // Recover simulation state if needed
+    simulation.recover();
+  });
+}
+
+startServer().catch(err => {
+  console.error('Fatal startup error:', err);
+  process.exit(1);
 });

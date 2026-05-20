@@ -1,4 +1,4 @@
-const { stmts, db: database } = require('./db');
+const { stmts, pool } = require('./db');
 
 const DAY_DURATION_MS = 10 * 60 * 1000; // 10 minutes per simulated day
 const PRICE_UPDATE_INTERVAL_MS = 2000;   // Update prices every 2 seconds
@@ -18,72 +18,75 @@ class SimulationEngine {
   /**
    * Get the current simulation state from the database.
    */
-  getState(simId) {
+  async getState(simId) {
     const id = simId || this.activeSimId;
     if (!id) return null;
 
-    const sim = stmts.getSimulation.get(id);
+    const sim = await stmts.getSimulation(id);
     if (!sim) return null;
+
+    // PostgreSQL returns BIGINT as string, convert to number
+    const dayStartTime = Number(sim.day_start_time) || 0;
+    const elapsedInDay = Number(sim.elapsed_in_day) || 0;
 
     let dayProgress = 0;
     let timeRemainingInDay = DAY_DURATION_MS;
 
     if (sim.status === 'running') {
-      const elapsed = sim.elapsed_in_day + (Date.now() - sim.day_start_time);
+      const elapsed = elapsedInDay + (Date.now() - dayStartTime);
       dayProgress = Math.min(elapsed / DAY_DURATION_MS, 1);
       timeRemainingInDay = Math.max(0, DAY_DURATION_MS - elapsed);
     } else if (sim.status === 'paused') {
-      dayProgress = Math.min(sim.elapsed_in_day / DAY_DURATION_MS, 1);
-      timeRemainingInDay = Math.max(0, DAY_DURATION_MS - sim.elapsed_in_day);
+      dayProgress = Math.min(elapsedInDay / DAY_DURATION_MS, 1);
+      timeRemainingInDay = Math.max(0, DAY_DURATION_MS - elapsedInDay);
     }
 
     return {
       ...sim,
+      day_start_time: dayStartTime,
+      elapsed_in_day: elapsedInDay,
       dayProgress,
       timeRemainingInDay,
       simDay: sim.status === 'running'
         ? sim.current_day + dayProgress
-        : sim.current_day + (sim.elapsed_in_day / DAY_DURATION_MS)
+        : sim.current_day + (elapsedInDay / DAY_DURATION_MS)
     };
   }
 
   /**
    * Start a simulation.
    */
-  start(simId) {
-    const sim = stmts.getSimulation.get(simId);
+  async start(simId) {
+    const sim = await stmts.getSimulation(simId);
     if (!sim) return { error: 'Simulation not found' };
     if (sim.status === 'running') return { error: 'Simulation already running' };
     if (sim.status === 'stopped') return { error: 'Cannot restart a stopped simulation' };
 
     // Check no other sim is running
-    const activeSim = stmts.getActiveSimulation.get();
+    const activeSim = await stmts.getActiveSimulation();
     if (activeSim && activeSim.id !== simId) {
       return { error: `Another simulation "${activeSim.name}" is currently active. Stop it first.` };
     }
 
-    const stocks = stmts.getSimStocks.all(simId);
+    const stocks = await stmts.getSimStocks(simId);
     if (stocks.length === 0) {
       return { error: 'Add at least one stock before starting' };
     }
 
     // Fresh start
     if (sim.status === 'not_started') {
-      // Reset stock prices
-      stmts.resetSimStockPrices.run(simId);
+      await stmts.resetSimStockPrices(simId);
 
-      // Add all approved participants
-      const approvedUsers = stmts.getApprovedUsers.all();
+      const approvedUsers = await stmts.getApprovedUsers();
       for (const user of approvedUsers) {
-        stmts.addParticipant.run(simId, user.id, sim.starting_cash);
+        await stmts.addParticipant(simId, user.id, sim.starting_cash);
       }
 
-      // Record initial prices
       for (const stock of stocks) {
-        stmts.addPriceHistory.run(stock.id, simId, stock.starting_price, 1);
+        await stmts.addPriceHistory(stock.id, simId, stock.starting_price, 1);
       }
 
-      stmts.updateSimulation.run({
+      await stmts.updateSimulation({
         id: simId,
         status: 'running',
         current_day: 1,
@@ -106,17 +109,17 @@ class SimulationEngine {
   /**
    * Resume after pause.
    */
-  resume(simId) {
+  async resume(simId) {
     const id = simId || this.activeSimId;
-    const sim = stmts.getSimulation.get(id);
+    const sim = await stmts.getSimulation(id);
     if (!sim || sim.status !== 'paused') return { error: 'Simulation is not paused' };
 
-    stmts.updateSimulation.run({
+    await stmts.updateSimulation({
       id,
       status: 'running',
       current_day: sim.current_day,
       day_start_time: Date.now(),
-      elapsed_in_day: sim.elapsed_in_day,
+      elapsed_in_day: Number(sim.elapsed_in_day) || 0,
       started_at: sim.started_at,
       paused_at: null,
       stopped_at: null
@@ -133,14 +136,14 @@ class SimulationEngine {
   /**
    * Pause the simulation.
    */
-  pause(simId) {
+  async pause(simId) {
     const id = simId || this.activeSimId;
-    const sim = stmts.getSimulation.get(id);
+    const sim = await stmts.getSimulation(id);
     if (!sim || sim.status !== 'running') return { error: 'Simulation is not running' };
 
-    const elapsed = sim.elapsed_in_day + (Date.now() - sim.day_start_time);
+    const elapsed = (Number(sim.elapsed_in_day) || 0) + (Date.now() - (Number(sim.day_start_time) || 0));
 
-    stmts.updateSimulation.run({
+    await stmts.updateSimulation({
       id,
       status: 'paused',
       current_day: sim.current_day,
@@ -161,25 +164,24 @@ class SimulationEngine {
   /**
    * Permanently stop and archive a simulation.
    */
-  stop(simId) {
+  async stop(simId) {
     const id = simId || this.activeSimId;
-    const sim = stmts.getSimulation.get(id);
+    const sim = await stmts.getSimulation(id);
     if (!sim) return { error: 'Simulation not found' };
     if (sim.status === 'stopped') return { error: 'Simulation already stopped' };
     if (sim.status === 'not_started') return { error: 'Simulation has not started' };
 
     // Save final price history
-    this._recordPriceHistory(id);
+    await this._recordPriceHistory(id);
 
     this._stopEngines();
 
-    // Calculate elapsed properly for running sims
-    let finalElapsed = sim.elapsed_in_day;
+    let finalElapsed = Number(sim.elapsed_in_day) || 0;
     if (sim.status === 'running') {
-      finalElapsed = sim.elapsed_in_day + (Date.now() - sim.day_start_time);
+      finalElapsed = finalElapsed + (Date.now() - (Number(sim.day_start_time) || 0));
     }
 
-    stmts.updateSimulation.run({
+    await stmts.updateSimulation({
       id,
       status: 'stopped',
       current_day: sim.current_day,
@@ -205,11 +207,11 @@ class SimulationEngine {
   /**
    * Apply news impacts to stock prices.
    */
-  applyNewsImpact(impacts, simId) {
+  async applyNewsImpact(impacts, simId) {
     const id = simId || this.activeSimId;
     if (!id) return;
 
-    const stocks = stmts.getSimStocks.all(id);
+    const stocks = await stmts.getSimStocks(id);
 
     const strengthMultiplier = {
       'mild': 0.02,
@@ -220,12 +222,10 @@ class SimulationEngine {
     for (const impact of impacts) {
       let affectedStocks = [];
 
-      // Direct stock targeting (admin-controlled) takes priority
       if (impact.stockId) {
         const stock = stocks.find(s => s.id === impact.stockId);
         if (stock) affectedStocks = [stock];
       } else if (impact.industry) {
-        // Fallback to industry-based matching
         affectedStocks = stocks.filter(s =>
           s.industry.toLowerCase() === impact.industry.toLowerCase()
         );
@@ -237,7 +237,6 @@ class SimulationEngine {
         if (impact.sentiment === 'positive') direction = 1;
         else if (impact.sentiment === 'negative') direction = -1;
 
-        // Use custom percentage if provided, otherwise use strength multiplier
         const pctChange = impact.percentChange
           ? Math.abs(impact.percentChange) / 100
           : multiplier;
@@ -245,12 +244,11 @@ class SimulationEngine {
           ? (impact.percentChange >= 0 ? 1 : -1)
           : direction;
 
-        // Sharp, immediate movement + random variation
         const variation = 1 + (Math.random() - 0.5) * 0.3;
         const change = stock.current_price * pctChange * finalDirection * variation;
         const newPrice = Math.max(0.01, stock.current_price + change);
 
-        stmts.updateStockPrice.run(newPrice, stock.buy_pressure || 0, stock.id);
+        await stmts.updateStockPrice(newPrice, stock.buy_pressure || 0, stock.id);
       }
     }
   }
@@ -261,22 +259,18 @@ class SimulationEngine {
   _startEngines() {
     this._stopEngines();
 
-    // Price update engine
     this.priceInterval = setInterval(() => {
-      this._updatePrices();
+      this._updatePrices().catch(e => console.error('Price update error:', e));
     }, PRICE_UPDATE_INTERVAL_MS);
 
-    // Day advancement timer
     this.dayTimer = setInterval(() => {
-      this._checkDayAdvancement();
+      this._checkDayAdvancement().catch(e => console.error('Day advancement error:', e));
     }, 1000);
 
-    // Price history recording
     this.historyInterval = setInterval(() => {
-      this._recordPriceHistory();
+      this._recordPriceHistory().catch(e => console.error('History record error:', e));
     }, HISTORY_SAVE_INTERVAL_MS);
 
-    // Broadcast state updates
     this.stateInterval = setInterval(() => {
       this._broadcastState();
       if (this.activeSimId) {
@@ -284,9 +278,8 @@ class SimulationEngine {
       }
     }, 3000);
 
-    // Check for scheduled news
     this.newsCheckInterval = setInterval(() => {
-      this._checkScheduledNews();
+      this._checkScheduledNews().catch(e => console.error('News check error:', e));
     }, 3000);
   }
 
@@ -304,10 +297,10 @@ class SimulationEngine {
   /**
    * Update all stock prices using Geometric Brownian Motion.
    */
-  _updatePrices() {
+  async _updatePrices() {
     if (!this.activeSimId) return;
 
-    const stocks = stmts.getSimStocks.all(this.activeSimId);
+    const stocks = await stmts.getSimStocks(this.activeSimId);
     const updates = [];
 
     const volatilityMap = {
@@ -325,17 +318,14 @@ class SimulationEngine {
       const randomShock = this._gaussianRandom() * volatility * Math.sqrt(dt);
       const priceChange = stock.current_price * (drift * dt + randomShock);
 
-      // Supply/demand pressure effect
       const pressure = (stock.buy_pressure || 0);
       const pressureEffect = stock.current_price * pressure * 0.01;
-
-      // Decay buy pressure over time
       const decayedPressure = pressure * 0.995;
 
       const newPrice = Math.max(0.01, stock.current_price + priceChange + pressureEffect);
       const percentChange = ((newPrice - stock.starting_price) / stock.starting_price) * 100;
 
-      stmts.updateStockPrice.run(newPrice, decayedPressure, stock.id);
+      await stmts.updateStockPrice(newPrice, decayedPressure, stock.id);
 
       updates.push({
         id: stock.id,
@@ -355,28 +345,25 @@ class SimulationEngine {
   /**
    * Check if the current day has elapsed and advance.
    */
-  _checkDayAdvancement() {
+  async _checkDayAdvancement() {
     if (!this.activeSimId) return;
 
-    const sim = stmts.getSimulation.get(this.activeSimId);
+    const sim = await stmts.getSimulation(this.activeSimId);
     if (!sim || sim.status !== 'running') return;
 
-    const elapsed = sim.elapsed_in_day + (Date.now() - sim.day_start_time);
+    const elapsed = (Number(sim.elapsed_in_day) || 0) + (Date.now() - (Number(sim.day_start_time) || 0));
 
     if (elapsed >= DAY_DURATION_MS) {
       const nextDay = sim.current_day + 1;
 
       if (nextDay > sim.total_days) {
-        // Simulation finished — auto stop
-        this.stop(this.activeSimId);
+        await this.stop(this.activeSimId);
         return;
       }
 
-      // Record end-of-day prices
-      this._recordPriceHistory();
+      await this._recordPriceHistory();
 
-      // Start next day
-      stmts.updateSimulation.run({
+      await stmts.updateSimulation({
         id: this.activeSimId,
         status: 'running',
         current_day: nextDay,
@@ -395,65 +382,59 @@ class SimulationEngine {
   /**
    * Record current prices to history.
    */
-  _recordPriceHistory(simId) {
+  async _recordPriceHistory(simId) {
     const id = simId || this.activeSimId;
     if (!id) return;
 
-    const state = this.getState(id);
+    const state = await this.getState(id);
     if (!state || state.status === 'not_started') return;
 
-    const stocks = stmts.getSimStocks.all(id);
-    const insertHistory = database.transaction(() => {
-      for (const stock of stocks) {
-        stmts.addPriceHistory.run(stock.id, id, stock.current_price, state.simDay);
-      }
-    });
-    insertHistory();
+    const stocks = await stmts.getSimStocks(id);
+    for (const stock of stocks) {
+      await stmts.addPriceHistory(stock.id, id, stock.current_price, state.simDay);
+    }
   }
 
   /**
    * Broadcast simulation state to all connected clients.
    */
-  _broadcastState() {
-    const state = this.activeSimId ? this.getState(this.activeSimId) : null;
+  async _broadcastState() {
+    const state = this.activeSimId ? await this.getState(this.activeSimId) : null;
     this.io.emit('simulation:state', state || { status: 'not_started' });
   }
 
   /**
    * Broadcast leaderboard to all connected clients.
    */
-  _broadcastLeaderboard(simId) {
+  async _broadcastLeaderboard(simId) {
     const { getLeaderboard } = require('./db');
-    const leaderboard = getLeaderboard(simId);
+    const leaderboard = await getLeaderboard(simId);
     this.io.emit('leaderboard:update', leaderboard);
   }
 
   /**
    * Check for scheduled news items that should be auto-published.
    */
-  _checkScheduledNews() {
+  async _checkScheduledNews() {
     if (!this.activeSimId) return;
 
-    const state = this.getState(this.activeSimId);
+    const state = await this.getState(this.activeSimId);
     if (!state || state.status !== 'running') return;
 
     const currentSimDay = state.simDay;
-    const dueNews = stmts.getDueScheduledNews.all(this.activeSimId, currentSimDay);
+    const dueNews = await stmts.getDueScheduledNews(this.activeSimId, currentSimDay);
 
     for (const newsItem of dueNews) {
       try {
         const impactsData = JSON.parse(newsItem.impacts);
         const impactsList = impactsData.impacts || impactsData;
 
-        // Mark as published
-        stmts.publishScheduledNews.run(currentSimDay, newsItem.id);
+        await stmts.publishScheduledNews(currentSimDay, newsItem.id);
 
-        // Apply price impacts
         if (Array.isArray(impactsList) && impactsList.length > 0) {
-          this.applyNewsImpact(impactsList, this.activeSimId);
+          await this.applyNewsImpact(impactsList, this.activeSimId);
         }
 
-        // Broadcast to all clients (hide impact details from participants)
         const broadcastItem = {
           headline: newsItem.headline,
           sim_day: Math.round(currentSimDay * 100) / 100,
@@ -481,8 +462,8 @@ class SimulationEngine {
   /**
    * Recovery: if the server restarts and a simulation was running, resume the engines.
    */
-  recover() {
-    const activeSim = stmts.getActiveSimulation.get();
+  async recover() {
+    const activeSim = await stmts.getActiveSimulation();
     if (activeSim) {
       this.activeSimId = activeSim.id;
       if (activeSim.status === 'running') {
