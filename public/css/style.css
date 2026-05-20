@@ -1395,6 +1395,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
   color: var(--blue-deep);
 }
 
+.stock-card-desc {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid rgba(0, 58, 92, 0.2);
+  opacity: 0.7;
+}
+
 .stock-card-footer {
   display: flex;
   align-items: center;
@@ -1932,4 +1943,54 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .stock-grid { grid-template-columns: 1fr; }
   .stock-detail-stats { grid-template-columns: repeat(2, 1fr); }
   .trade-panel { grid-template-columns: 1fr; }
+}
+
+/* ─── Rank Change Popups ────────────────────────────────────── */
+.rank-popup {
+  position: fixed;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  z-index: 10000;
+  padding: 1.2rem 2.5rem;
+  border-radius: 8px;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  pointer-events: none;
+  animation: rankPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.4s, transform 0.4s;
+}
+
+.rank-popup.rank-up {
+  background: linear-gradient(135deg, rgba(0,200,80,0.95), rgba(0,150,60,0.95));
+  color: #fff;
+  box-shadow: 0 0 40px rgba(0,200,80,0.5), 0 8px 25px rgba(0,0,0,0.3);
+  border: 2px solid rgba(100,255,150,0.4);
+  text-shadow: 0 0 10px rgba(0,255,100,0.5);
+}
+
+.rank-popup.rank-down {
+  background: linear-gradient(135deg, rgba(220,40,40,0.95), rgba(180,20,20,0.95));
+  color: #fff;
+  box-shadow: 0 0 40px rgba(255,50,50,0.5), 0 8px 25px rgba(0,0,0,0.3);
+  border: 2px solid rgba(255,100,100,0.4);
+  text-shadow: 0 0 10px rgba(255,100,100,0.5);
+}
+
+.rank-popup.rank-first {
+  background: linear-gradient(135deg, rgba(255,200,0,0.95), rgba(255,160,0,0.95));
+  color: #1a0a00;
+  box-shadow: 0 0 50px rgba(255,200,0,0.6), 0 8px 25px rgba(0,0,0,0.3);
+  border: 2px solid rgba(255,230,100,0.6);
+  text-shadow: 0 0 8px rgba(255,200,0,0.4);
+  font-size: 1.5rem;
+}
+
+@keyframes rankPopIn {
+  from { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }

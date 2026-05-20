@@ -31,6 +31,7 @@
   let selectedStock = null;
   let priceChart = null;
   let newsList = [];
+  let lastRank = null; // Track leaderboard position for change popups
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -46,6 +47,23 @@
       toast.style.opacity = '0';
       toast.style.transform = 'translateX(15px)';
       setTimeout(() => toast.remove(), 250);
+    }, 4000);
+  }
+
+  function showRankPopup(message, type = 'rank-up') {
+    // Remove existing rank popup
+    const existing = document.querySelector('.rank-popup');
+    if (existing) existing.remove();
+
+    const popup = document.createElement('div');
+    popup.className = `rank-popup ${type}`;
+    popup.innerHTML = `<span>${message}</span>`;
+    document.body.appendChild(popup);
+
+    setTimeout(() => {
+      popup.style.opacity = '0';
+      popup.style.transform = 'translate(-50%, -60%) scale(0.8)';
+      setTimeout(() => popup.remove(), 400);
     }, 4000);
   }
 
@@ -204,6 +222,8 @@
       const volLevel = 'MEDIUM'; // Placeholder
       const volBars = 2;
 
+      const desc = s.description ? s.description.substring(0, 80) + (s.description.length > 80 ? '...' : '') : '';
+
       return `
         <div class="stock-card ${changeClass}" style="--stock-accent: ${color};"
              onclick="openStockModal(${s.id})" id="stock-card-${s.id}">
@@ -218,6 +238,7 @@
           <div class="stock-card-change ${changeClass}">
             ${arrow} ${isPositive ? '+' : ''}${s.percentChange.toFixed(2)}%
           </div>
+          ${desc ? `<div class="stock-card-desc">${desc}</div>` : ''}
           <div class="stock-card-footer">
             <div class="volatility-indicator">
               ${[1,2,3].map(i => `<div class="volatility-bar ${i <= volBars ? 'active' : ''}"></div>`).join('')}
@@ -261,6 +282,25 @@
     $('#modal-starting-price').textContent = `₹${selectedStock.startingPrice.toFixed(2)}`;
     $('#modal-percent-change').textContent = `${selectedStock.percentChange >= 0 ? '+' : ''}${selectedStock.percentChange.toFixed(2)}%`;
     $('#modal-percent-change').style.color = selectedStock.percentChange >= 0 ? 'var(--price-up)' : 'var(--price-down)';
+
+    // Stock info panel
+    let infoEl = $('#modal-stock-info');
+    if (!infoEl) {
+      infoEl = document.createElement('div');
+      infoEl.id = 'modal-stock-info';
+      const priceEl = $('#modal-current-price').closest('.modal-info-row') || $('#modal-current-price').parentElement;
+      priceEl.parentElement.insertBefore(infoEl, priceEl.nextSibling);
+    }
+    if (selectedStock.description) {
+      infoEl.innerHTML = `
+        <div style="margin: 0.5rem 0 0.75rem; padding: 0.6rem 0.75rem; background: rgba(0,170,255,0.05); border: 1px solid rgba(0,170,255,0.15); border-radius: 4px;">
+          <div style="font-size: 0.6rem; color: var(--blue-primary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25rem; font-weight: 700;">ℹ️ ABOUT THIS COMPANY // ${selectedStock.industry}</div>
+          <div style="font-size: 0.72rem; color: var(--text-primary); line-height: 1.5; font-family: 'Source Code Pro', monospace;">${selectedStock.description}</div>
+        </div>
+      `;
+    } else {
+      infoEl.innerHTML = '';
+    }
 
     // Holdings
     const holding = portfolio.holdings.find(h => h.stock_id === stockId);
@@ -795,6 +835,23 @@
   });
 
   socket.on('leaderboard:update', (data) => {
+    // Track rank changes and show popups
+    if (data && data.length > 0 && currentUser) {
+      const myEntry = data.find(p => p.userId === currentUser.id);
+      if (myEntry) {
+        const currentRank = myEntry.rank;
+        if (lastRank !== null && currentRank !== lastRank) {
+          if (currentRank === 1 && lastRank !== 1) {
+            showRankPopup('👑 YOU\'RE #1!', 'rank-first');
+          } else if (currentRank < lastRank) {
+            showRankPopup(`🔼 You moved UP to #${currentRank}!`, 'rank-up');
+          } else if (currentRank > lastRank) {
+            showRankPopup(`🔽 You dropped to #${currentRank}`, 'rank-down');
+          }
+        }
+        lastRank = currentRank;
+      }
+    }
     if ($('#leaderboard-tab').classList.contains('active')) {
       renderLeaderboard(data);
     }
@@ -850,6 +907,7 @@
           startingPrice: s.starting_price,
           percentChange: ((s.current_price - s.starting_price) / s.starting_price * 100),
           industry: s.industry,
+          description: s.description || '',
           colorIndex: s.color_index
         };
       });
