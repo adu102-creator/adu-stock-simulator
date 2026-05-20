@@ -126,7 +126,7 @@ async function geminiAnalyze(headline, availableIndustries, stockContext) {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       systemInstruction: SYSTEM_PROMPT,
       generationConfig: {
         temperature: 0.3,        // Low temperature for consistent, structured output
@@ -159,7 +159,7 @@ async function geminiSuggest(stocks, sentiment, strength) {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       systemInstruction: SYSTEM_PROMPT,
       generationConfig: {
         temperature: 0.8,        // Higher temperature for creative headline generation
