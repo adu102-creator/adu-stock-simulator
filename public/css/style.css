@@ -1776,11 +1776,90 @@ input[type="range"]::-webkit-slider-thumb:hover {
   text-align: right;
 }
 
-/* News flash */
+/* News flash - Breaking news banner overlay */
+.news-flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #ff0033, #cc0000, #ff1a1a);
+  color: #fff;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  box-shadow: 0 4px 30px rgba(255, 0, 0, 0.6), 0 0 60px rgba(255, 0, 0, 0.3);
+  animation: breakingNewsDrop 0.4s ease-out, breakingNewsPulse 1.5s ease-in-out infinite;
+  border-bottom: 3px solid #ff6666;
+}
+
+.news-flash-overlay .breaking-label {
+  display: inline-block;
+  background: #fff;
+  color: #cc0000;
+  padding: 0.15rem 0.6rem;
+  margin-right: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  border-radius: 2px;
+  animation: breakingBlink 1s ease-in-out infinite;
+}
+
+.news-flash-overlay .breaking-text {
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes breakingNewsDrop {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes breakingNewsPulse {
+  0%, 100% { background: linear-gradient(135deg, #ff0033, #cc0000, #ff1a1a); }
+  50% { background: linear-gradient(135deg, #cc0000, #990000, #cc0000); }
+}
+
+@keyframes breakingBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Latest news item in feed has red accent */
+.news-item.news-breaking {
+  border-left: 4px solid #ff0033 !important;
+  background: rgba(255, 0, 51, 0.08) !important;
+  box-shadow: -4px 0 15px rgba(255, 0, 51, 0.3) !important;
+  animation: newsItemPulse 2s ease-in-out 3;
+}
+
+.news-item.news-breaking .news-content h4 {
+  color: #ff4466 !important;
+  font-size: 0.9rem !important;
+  font-weight: 700 !important;
+}
+
+.news-item.news-breaking .news-content h4::before {
+  content: '⚡ ' !important;
+  color: #ff0033 !important;
+}
+
+@keyframes newsItemPulse {
+  0%, 100% { background: rgba(255, 0, 51, 0.08); }
+  50% { background: rgba(255, 0, 51, 0.15); }
+}
+
+/* Old subtle flash for the feed panel background */
 .news-flash { animation: newsFlash 2s ease; }
 
 @keyframes newsFlash {
-  0% { background: rgba(0, 170, 255, 0.1); }
+  0% { background: rgba(255, 0, 51, 0.15); }
   100% { background: transparent; }
 }
 

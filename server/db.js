@@ -175,6 +175,16 @@ const stmts = {
   getAllSimulations: () => queryAll('SELECT * FROM simulations ORDER BY created_at DESC'),
   getActiveSimulation: () => queryOne("SELECT * FROM simulations WHERE status IN ('running', 'paused') LIMIT 1"),
   getArchivedSimulations: () => queryAll("SELECT * FROM simulations WHERE status = 'stopped' ORDER BY stopped_at DESC"),
+  deleteSimulationData: async (simId) => {
+    // Delete in correct order respecting foreign keys
+    await pool.query('DELETE FROM trades WHERE simulation_id = $1', [simId]);
+    await pool.query('DELETE FROM holdings WHERE simulation_id = $1', [simId]);
+    await pool.query('DELETE FROM price_history WHERE simulation_id = $1', [simId]);
+    await pool.query('DELETE FROM news WHERE simulation_id = $1', [simId]);
+    await pool.query('DELETE FROM stocks WHERE simulation_id = $1', [simId]);
+    await pool.query('DELETE FROM simulation_participants WHERE simulation_id = $1', [simId]);
+    await pool.query('DELETE FROM simulations WHERE id = $1', [simId]);
+  },
   updateSimulation: (p) => execute(
     'UPDATE simulations SET status=$1, current_day=$2, day_start_time=$3, elapsed_in_day=$4, started_at=$5, paused_at=$6, stopped_at=$7 WHERE id=$8',
     [p.status, p.current_day, p.day_start_time, p.elapsed_in_day, p.started_at, p.paused_at, p.stopped_at, p.id]

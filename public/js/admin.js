@@ -94,6 +94,7 @@
       };
       const badgeClass = s.status === 'stopped' ? 'archived' : s.status.replace('_', '-');
       const isActive = simState.id && simState.id === s.id;
+      const canDelete = s.status === 'not_started' || s.status === 'stopped';
 
       return `
         <div class="sim-card ${isActive ? 'active-sim' : ''}" onclick="selectSimulation(${s.id})">
@@ -103,6 +104,7 @@
           </div>
           <div class="sim-card-actions">
             <span class="status-badge ${badgeClass}"><span class="status-dot"></span>${statusMap[s.status] || s.status}</span>
+            ${canDelete ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteSimulation(${s.id}, '${escapeHtml(s.name)}')" style="margin-left:0.5rem;font-size:0.55rem;padding:0.15rem 0.4rem;">[ ✕ DELETE ]</button>` : ''}
           </div>
         </div>
       `;
@@ -208,6 +210,24 @@
     const state = (simState.id === id) ? simState : sim;
     updateSimUI({ ...state, id });
     updateActiveSimPanel();
+  };
+
+  window.deleteSimulation = async function(id, name) {
+    if (!confirm(`DELETE simulation "${name}"?\n\nThis will permanently delete ALL data:\n- All stocks\n- All trades & holdings\n- All price history\n- All news\n- All participant data\n\nThis action CANNOT be undone.`)) return;
+    try {
+      const res = await fetch(`/api/admin/simulations/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToast('[ SIMULATION DELETED ]', 'warning');
+        if (selectedSimId === id) {
+          selectedSimId = null;
+          $('#active-sim-panel').style.display = 'none';
+        }
+        loadSimulations();
+      } else {
+        showToast(data.error || 'DELETE FAILED', 'error');
+      }
+    } catch { showToast('DELETE FAILED', 'error'); }
   };
 
   // Create simulation

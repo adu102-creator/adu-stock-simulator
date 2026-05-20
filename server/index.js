@@ -186,6 +186,26 @@ app.get('/api/admin/simulations/:id', requireAdmin, async (req, res) => {
   res.json(sim);
 });
 
+app.delete('/api/admin/simulations/:id', requireAdmin, async (req, res) => {
+  try {
+    const simId = parseInt(req.params.id);
+    const sim = await stmts.getSimulation(simId);
+    if (!sim) return res.status(404).json({ error: 'Simulation not found' });
+
+    if (sim.status === 'running' || sim.status === 'paused') {
+      return res.status(400).json({ error: 'Cannot delete a running or paused simulation. Stop it first.' });
+    }
+
+    // Cascade delete all related data
+    await stmts.deleteSimulationData(simId);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete simulation error:', error);
+    res.status(500).json({ error: 'Failed to delete simulation' });
+  }
+});
+
 // Simulation controls
 app.post('/api/admin/simulation/:id/start', requireAdmin, async (req, res) => {
   const result = await simulation.start(parseInt(req.params.id));

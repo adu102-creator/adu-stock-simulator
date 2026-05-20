@@ -755,9 +755,40 @@
     // Prepend to news list
     newsList.unshift(newsItem);
     renderNewsFeed();
-    showToast(`[ BREAKING ] ${newsItem.headline.substring(0, 45)}...`, 'info');
 
-    // Brief flash on the news feed
+    // Mark the first item as breaking news (pulsing red)
+    const firstItem = document.querySelector('#news-feed-content .news-item');
+    if (firstItem) {
+      firstItem.classList.add('news-breaking');
+      setTimeout(() => firstItem.classList.remove('news-breaking'), 15000);
+    }
+
+    // Create massive BREAKING NEWS overlay banner
+    const existing = document.querySelector('.news-flash-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'news-flash-overlay';
+    overlay.innerHTML = `
+      <span class="breaking-label">⚡ BREAKING NEWS</span>
+      <span class="breaking-text">${newsItem.headline}</span>
+    `;
+    document.body.appendChild(overlay);
+
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+      overlay.style.animation = 'breakingNewsDrop 0.4s ease-in reverse';
+      setTimeout(() => overlay.remove(), 400);
+    }, 8000);
+
+    // Click to dismiss
+    overlay.addEventListener('click', () => {
+      overlay.style.animation = 'breakingNewsDrop 0.3s ease-in reverse';
+      setTimeout(() => overlay.remove(), 300);
+    });
+    overlay.style.cursor = 'pointer';
+
+    // Brief flash on the news feed panel too
     const feedPanel = $('#news-feed-panel');
     feedPanel.classList.add('news-flash');
     setTimeout(() => feedPanel.classList.remove('news-flash'), 2000);
