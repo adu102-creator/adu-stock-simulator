@@ -1,29 +1,200 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-let client = null;
+// ============================================================
+// AI Provider Setup — Gemini (primary) → Claude (fallback) → Keywords (final)
+// ============================================================
 
-function getClient() {
-  if (!client && process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here') {
-    client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+let geminiClient = null;
+let anthropicClient = null;
+
+function getGeminiClient() {
+  if (!geminiClient && process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
+    geminiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   }
-  return client;
+  return geminiClient;
 }
 
-/**
- * Analyze a news headline using Claude API.
- * Returns structured impact data with detailed reasoning for each industry.
- */
-async function analyzeHeadline(headline, availableIndustries, stockContext = []) {
-  const anthropic = getClient();
+function getAnthropicClient() {
+  if (!anthropicClient && process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here') {
+    try {
+      const Anthropic = require('@anthropic-ai/sdk');
+      anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    } catch (e) {
+      // @anthropic-ai/sdk not installed — skip
+    }
+  }
+  return anthropicClient;
+}
 
-  if (!anthropic) {
-    console.warn('Claude API key not configured — using fallback analysis');
-    return fallbackAnalysis(headline, availableIndustries);
+// ============================================================
+// Custom Financial Analyst System Prompt
+// This is the "Custom GPT" personality and rules
+// ============================================================
+
+const SYSTEM_PROMPT = `You are the **Stock Market Simulator — Custom Financial Analyst AI**.
+
+You are an elite-level financial analyst embedded inside a real-time stock market simulation platform used by university students to learn investing. Your job is to analyze news headlines and determine their realistic impact on the stocks and industries currently active in the simulation.
+
+## YOUR CORE RULES
+
+### 1. CAUSAL LOGIC IS MANDATORY
+You must trace a clear, realistic economic chain of events from the news headline to the price impact. Never guess randomly. Think like a real Wall Street analyst:
+- "Rising oil prices" → increases input costs for airlines → negative for Aviation
+- "Government announces solar subsidies" → reduces costs for solar companies → positive for Energy
+- "Data breach at major tech firm" → erodes consumer trust → negative for Technology
+
+### 2. USE STOCK DESCRIPTIONS
+Each stock has a description explaining what the company does. USE IT. If a headline says "New agricultural drone regulations", and one of the stocks is described as "Agricultural drone manufacturer", that stock should be strongly affected — not just the generic "Agriculture" industry.
+
+### 3. STRENGTH CALIBRATION
+- "mild" = routine news, 1–3% price movement. Example: quarterly earnings slightly beat expectations
+- "moderate" = significant event, 3–6% price movement. Example: new government policy affecting the sector
+- "strong" = major event, 7–12% price movement. Example: massive scandal, breakthrough innovation, emergency regulation
+
+### 4. BE SELECTIVE
+Only include industries and stocks that are genuinely affected. If a headline is vague or doesn't clearly impact any specific industry, return an EMPTY impacts array. Never force impacts where none logically exist.
+
+### 5. SMART INVESTOR ACTION
+Your "smartInvestorAction" must be specific and educational. Tell the student exactly which industries to buy, sell, or hold — and WHY. This is a teaching tool.
+
+### 6. OUTPUT FORMAT
+You MUST respond with ONLY valid JSON — no markdown, no explanation, no code fences. Just the raw JSON object.`;
+
+// ============================================================
+// Build the user prompt with full stock context
+// ============================================================
+
+function buildAnalysisPrompt(headline, availableIndustries, stockContext) {
+  let stockInfo = '';
+  if (stockContext && stockContext.length > 0) {
+    stockInfo = '\n\n=== STOCKS IN THIS SIMULATION ===\n' + stockContext.map(s =>
+      `• ${s.ticker} (${s.name}) — Industry: ${s.industry}${s.description ? `\n  Description: ${s.description}` : ''}`
+    ).join('\n');
   }
 
-  // Build stock context string for the prompt
+  return `Analyze this news headline and determine its impact on the stock market simulation.
+
+=== AVAILABLE INDUSTRIES ===
+${availableIndustries.join(', ')}
+${stockInfo}
+
+=== NEWS HEADLINE ===
+"${headline}"
+
+Respond with ONLY this JSON structure:
+{
+  "impacts": [
+    {
+      "industry": "IndustryName",
+      "sentiment": "positive|negative|neutral",
+      "strength": "mild|moderate|strong",
+      "reasoning": "2-4 sentences explaining the causal chain from news to price impact. Explain real-world market logic and what a smart investor would notice."
+    }
+  ],
+  "summary": "One sentence summarizing the overall market impact",
+  "smartInvestorAction": "2-3 sentences of specific, actionable advice: which industries to buy, sell, or hold and why"
+}`;
+}
+
+function buildSuggestionPrompt(stocks, sentiment, strength) {
+  const stockInfo = stocks.map(s =>
+    `• ${s.ticker} (${s.name}) — ${s.industry}${s.description ? ': ' + s.description : ''}`
+  ).join('\n');
+
+  return `Generate 5 realistic financial news headlines that would cause a ${sentiment} ${strength} impact on these stocks:
+
+${stockInfo}
+
+Rules:
+- Headlines must be realistic and could appear in a financial newspaper like The Economic Times or Bloomberg
+- Each headline should clearly affect the listed companies/industries
+- Impact should be ${strength} (${strength === 'mild' ? '1-3%' : strength === 'moderate' ? '3-6%' : '7-12%'} price movement)
+- Sentiment: ${sentiment}
+- Vary the types: government policy, market event, company-specific, global event, regulatory action
+- Make headlines specific and detailed, not generic
+
+Respond with ONLY this JSON: {"headlines": ["headline1", "headline2", "headline3", "headline4", "headline5"]}`;
+}
+
+// ============================================================
+// Gemini API Calls
+// ============================================================
+
+async function geminiAnalyze(headline, availableIndustries, stockContext) {
+  const genAI = getGeminiClient();
+  if (!genAI) return null;
+
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      systemInstruction: SYSTEM_PROMPT,
+      generationConfig: {
+        temperature: 0.3,        // Low temperature for consistent, structured output
+        maxOutputTokens: 2000,
+        responseMimeType: 'application/json'  // Force JSON output
+      }
+    });
+
+    const prompt = buildAnalysisPrompt(headline, availableIndustries, stockContext);
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+
+    // Parse the JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('✅ Gemini analysis complete:', parsed.summary);
+      return parsed;
+    }
+    throw new Error('No valid JSON in Gemini response');
+  } catch (error) {
+    console.error('❌ Gemini analysis error:', error.message);
+    return null;
+  }
+}
+
+async function geminiSuggest(stocks, sentiment, strength) {
+  const genAI = getGeminiClient();
+  if (!genAI) return null;
+
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      systemInstruction: SYSTEM_PROMPT,
+      generationConfig: {
+        temperature: 0.8,        // Higher temperature for creative headline generation
+        maxOutputTokens: 1500,
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const prompt = buildSuggestionPrompt(stocks, sentiment, strength);
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('✅ Gemini generated', parsed.headlines?.length || 0, 'headline suggestions');
+      return parsed;
+    }
+    throw new Error('No valid JSON in Gemini suggestion response');
+  } catch (error) {
+    console.error('❌ Gemini suggestion error:', error.message);
+    return null;
+  }
+}
+
+// ============================================================
+// Claude API Calls (Fallback)
+// ============================================================
+
+async function claudeAnalyze(headline, availableIndustries, stockContext) {
+  const anthropic = getAnthropicClient();
+  if (!anthropic) return null;
+
   let stockInfo = '';
-  if (stockContext.length > 0) {
+  if (stockContext && stockContext.length > 0) {
     stockInfo = '\n\nStocks in the simulation:\n' + stockContext.map(s =>
       `- ${s.ticker} (${s.name}) — Industry: ${s.industry}${s.description ? ` — ${s.description}` : ''}`
     ).join('\n');
@@ -35,53 +206,88 @@ async function analyzeHeadline(headline, availableIndustries, stockContext = [])
       max_tokens: 2000,
       messages: [{
         role: 'user',
-        content: `You are an expert financial analyst advising on a stock market simulation. Analyze this news headline and determine its impact on stock market industries.
-
-Available industries in this simulation: ${availableIndustries.join(', ')}${stockInfo}
-
-News headline: "${headline}"
-
-Respond ONLY with valid JSON in this exact format, no other text:
-{
-  "impacts": [
-    {
-      "industry": "IndustryName",
-      "sentiment": "positive|negative|neutral",
-      "strength": "mild|moderate|strong",
-      "reasoning": "A detailed 2-4 sentence explanation of WHY this industry is affected. Explain the real-world market logic, the causal chain from the news to the price movement, and what a smart investor would likely do in response. Example: 'Rising energy subsidies typically reduce operating costs for renewable firms, increasing their profit margins. Investors would likely rotate into this sector anticipating earnings growth, driving demand and price upward.'"
-    }
-  ],
-  "summary": "Brief 1-sentence overall market impact summary",
-  "smartInvestorAction": "A 2-3 sentence explanation of what action (buy/sell/hold/switch sector) a smart investor would take in response to this news and why. Be specific about which industries to buy into, sell out of, or hold."
-}
-
-Rules:
-- Only include industries from the available list that are genuinely affected
-- Be realistic about which industries would be impacted
-- Consider the company descriptions when determining impact relevance
-- If no industries are clearly affected, return an empty impacts array
-- strength should reflect how significantly the news would move stock prices
-- The reasoning for each industry MUST explain the causal mechanism and investor behavior
-- smartInvestorAction should be actionable and educational`
+        content: `${SYSTEM_PROMPT}\n\n${buildAnalysisPrompt(headline, availableIndustries, stockContext)}`
       }]
     });
 
     const text = response.content[0].text.trim();
-    // Extract JSON from the response (handle potential markdown wrapping)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('✅ Claude analysis complete:', parsed.summary);
+      return parsed;
     }
-    throw new Error('No valid JSON in response');
+    throw new Error('No valid JSON in Claude response');
   } catch (error) {
-    console.error('Claude API error:', error.message);
-    return fallbackAnalysis(headline, availableIndustries);
+    console.error('❌ Claude analysis error:', error.message);
+    return null;
   }
 }
 
+async function claudeSuggest(stocks, sentiment, strength) {
+  const anthropic = getAnthropicClient();
+  if (!anthropic) return null;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1500,
+      messages: [{
+        role: 'user',
+        content: buildSuggestionPrompt(stocks, sentiment, strength)
+      }]
+    });
+    const text = response.content[0].text.trim();
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+  } catch (e) {
+    console.error('❌ Claude suggestion error:', e.message);
+  }
+  return null;
+}
+
+// ============================================================
+// Main Entry Points — Cascading: Gemini → Claude → Keywords
+// ============================================================
+
 /**
- * Fallback keyword-based analysis when Claude API is unavailable.
+ * Analyze a news headline. Tries Gemini first, then Claude, then keyword fallback.
  */
+async function analyzeHeadline(headline, availableIndustries, stockContext = []) {
+  // 1. Try Gemini (primary)
+  const geminiResult = await geminiAnalyze(headline, availableIndustries, stockContext);
+  if (geminiResult) return geminiResult;
+
+  // 2. Try Claude (secondary)
+  const claudeResult = await claudeAnalyze(headline, availableIndustries, stockContext);
+  if (claudeResult) return claudeResult;
+
+  // 3. Keyword fallback (always available)
+  console.warn('⚠️  No AI API keys configured — using keyword fallback analysis');
+  return fallbackAnalysis(headline, availableIndustries);
+}
+
+/**
+ * Generate news headline suggestions. Tries Gemini first, then Claude, then templates.
+ */
+async function generateNewsSuggestions(stocks, sentiment, strength) {
+  // 1. Try Gemini
+  const geminiResult = await geminiSuggest(stocks, sentiment, strength);
+  if (geminiResult) return geminiResult;
+
+  // 2. Try Claude
+  const claudeResult = await claudeSuggest(stocks, sentiment, strength);
+  if (claudeResult) return claudeResult;
+
+  // 3. Template fallback
+  console.warn('⚠️  No AI API keys configured — using template fallback suggestions');
+  return fallbackSuggestions(stocks, sentiment, strength);
+}
+
+// ============================================================
+// Keyword Fallback Analysis (no API needed)
+// ============================================================
+
 function fallbackAnalysis(headline, availableIndustries) {
   const lower = headline.toLowerCase();
   const impacts = [];
@@ -150,8 +356,8 @@ function fallbackAnalysis(headline, availableIndustries) {
     'Agriculture': {
       positive: ['bumper crop', 'agri subsidy', 'farm reform', 'monsoon normal', 'food export', 'harvest', 'crop yield', 'agritech', 'fertilizer'],
       negative: ['drought', 'crop failure', 'pest attack', 'flood damage', 'farm distress', 'locust', 'poor monsoon', 'food shortage'],
-      posReasoning: 'Favorable agricultural conditions improve crop yields and farm income, boosting demand for agri-inputs and rural consumer goods. This has cascading positive effects on the rural economy.',
-      negReasoning: 'Agricultural stress reduces farm output and increases food prices, squeezing margins for food processors and reducing rural spending power. Investors avoid agri-dependent stocks during uncertainty.'
+      posReasoning: 'Favorable agricultural conditions improve crop yields and farm income, boosting demand for agri-inputs and rural consumer goods.',
+      negReasoning: 'Agricultural stress reduces farm output and increases food prices, squeezing margins for food processors and reducing rural spending power.'
     },
     'Pharmaceuticals': {
       positive: ['drug approval', 'fda', 'clinical trial success', 'pharma deal', 'generic drug', 'patent', 'biotech', 'vaccine rollout', 'drug discovery', 'pharma merger'],
@@ -276,48 +482,9 @@ function fallbackAnalysis(headline, availableIndustries) {
   };
 }
 
-/**
- * Generate news headline suggestions based on selected stocks and desired impact.
- */
-async function generateNewsSuggestions(stocks, sentiment, strength) {
-  const anthropic = getClient();
-
-  const stockInfo = stocks.map(s =>
-    `${s.ticker} (${s.name}) — ${s.industry}${s.description ? ': ' + s.description : ''}`
-  ).join('\n');
-
-  if (anthropic) {
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        messages: [{
-          role: 'user',
-          content: `Generate 5 realistic news headlines that would cause a ${sentiment} ${strength} impact on these stocks:
-
-${stockInfo}
-
-Rules:
-- Headlines must be realistic and could appear in a financial newspaper
-- Each headline should clearly affect the listed companies/industries
-- Impact should be ${strength} (${strength === 'mild' ? '1-3%' : strength === 'moderate' ? '3-6%' : '7-12%'} price movement)
-- Sentiment: ${sentiment}
-- Vary the types: government policy, market event, company-specific, global event, regulatory
-
-Respond ONLY with JSON: {"headlines": ["headline1", "headline2", ...]}` 
-        }]
-      });
-      const text = response.content[0].text.trim();
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) return JSON.parse(match[0]);
-    } catch (e) {
-      console.error('Claude suggestion error:', e.message);
-    }
-  }
-
-  // Fallback: generate from templates
-  return fallbackSuggestions(stocks, sentiment, strength);
-}
+// ============================================================
+// Fallback News Suggestions (template-based)
+// ============================================================
 
 function fallbackSuggestions(stocks, sentiment, strength) {
   const templates = {
@@ -381,4 +548,23 @@ function fallbackSuggestions(stocks, sentiment, strength) {
   return { headlines };
 }
 
-module.exports = { analyzeHeadline, generateNewsSuggestions };
+// ============================================================
+// Startup Logging
+// ============================================================
+
+function logAIStatus() {
+  const gemini = getGeminiClient();
+  const claude = getAnthropicClient();
+
+  if (gemini) {
+    console.log('🤖 AI Engine: Gemini (primary) ✅');
+  }
+  if (claude) {
+    console.log('🤖 AI Engine: Claude (fallback) ✅');
+  }
+  if (!gemini && !claude) {
+    console.log('⚠️  AI Engine: No API keys configured — using keyword fallback only');
+  }
+}
+
+module.exports = { analyzeHeadline, generateNewsSuggestions, logAIStatus };

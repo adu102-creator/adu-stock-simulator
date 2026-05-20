@@ -7,7 +7,7 @@ const session = require('express-session');
 const path = require('path');
 const { stmts, initDB, createUser, verifyPassword, executeTrade, getLeaderboard } = require('./db');
 const SimulationEngine = require('./simulation');
-const { analyzeHeadline, generateNewsSuggestions } = require('./ai');
+const { analyzeHeadline, generateNewsSuggestions, logAIStatus } = require('./ai');
 
 const app = express();
 const server = http.createServer(app);
@@ -738,6 +738,9 @@ async function startServer() {
   ║  🔑 Password: ${(process.env.ADMIN_PASSWORD || 'admin123').padEnd(27)}║
   ╚══════════════════════════════════════════════╝
     `);
+
+    // Log which AI engine is active
+    logAIStatus();
 
     // Recover simulation state if needed
     simulation.recover();
