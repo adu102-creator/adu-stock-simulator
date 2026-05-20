@@ -13,6 +13,7 @@ class SimulationEngine {
     this.stateInterval = null;
     this.newsCheckInterval = null;
     this.activeSimId = null; // Currently active simulation ID
+    this.activeImpacts = [];  // Persistent news impact queue
   }
 
   /**
@@ -85,6 +86,8 @@ class SimulationEngine {
       for (const stock of stocks) {
         await stmts.addPriceHistory(stock.id, simId, stock.starting_price, 1);
       }
+
+      this.activeImpacts = []; // Clear impact queue for fresh start
 
       await stmts.updateSimulation({
         id: simId,
@@ -175,6 +178,7 @@ class SimulationEngine {
     await this._recordPriceHistory(id);
 
     this._stopEngines();
+    this.activeImpacts = []; // Clear impact queue
 
     let finalElapsed = Number(sim.elapsed_in_day) || 0;
     if (sim.status === 'running') {
@@ -219,6 +223,13 @@ class SimulationEngine {
       'strong': 0.09
     };
 
+    // How many ticks the impact persists (at 2s per tick)
+    const strengthDuration = {
+      'mild': 15,      // ~30 seconds
+      'moderate': 30,   // ~1 minute
+      'strong': 60      // ~2 minutes
+    };
+
     for (const impact of impacts) {
       let affectedStocks = [];
 
@@ -244,11 +255,31 @@ class SimulationEngine {
           ? (impact.percentChange >= 0 ? 1 : -1)
           : direction;
 
+        // Immediate price jump (50% of total impact)
         const variation = 1 + (Math.random() - 0.5) * 0.3;
-        const change = stock.current_price * pctChange * finalDirection * variation;
-        const newPrice = Math.max(0.01, stock.current_price + change);
+        const immediateChange = stock.current_price * pctChange * finalDirection * variation * 0.5;
+        const newPrice = Math.max(0.01, stock.current_price + immediateChange);
 
-        await stmts.updateStockPrice(newPrice, stock.buy_pressure || 0, stock.id);
+        // Reset buy_pressure on negative news to prevent demand overriding bad news
+        let newPressure = stock.buy_pressure || 0;
+        if (finalDirection < 0) {
+          newPressure = Math.min(0, newPressure * 0.2); // Crush positive pressure on bad news
+        } else if (finalDirection > 0) {
+          newPressure = Math.max(0, newPressure) + multiplier * 2; // Boost positive momentum
+        }
+
+        await stmts.updateStockPrice(newPrice, newPressure, stock.id);
+
+        // Queue persistent impact (remaining 50% spread over time with decay)
+        const totalTicks = strengthDuration[impact.strength] || 15;
+        const persistentMagnitude = stock.current_price * pctChange * finalDirection * variation * 0.5 / totalTicks;
+
+        this.activeImpacts.push({
+          stockId: stock.id,
+          magnitude: persistentMagnitude,
+          remainingTicks: totalTicks,
+          totalTicks: totalTicks
+        });
       }
     }
   }
@@ -318,11 +349,27 @@ class SimulationEngine {
       const randomShock = this._gaussianRandom() * volatility * Math.sqrt(dt);
       const priceChange = stock.current_price * (drift * dt + randomShock);
 
+      // Buy pressure with cap (Fix #5)
       const pressure = (stock.buy_pressure || 0);
-      const pressureEffect = stock.current_price * pressure * 0.01;
-      const decayedPressure = pressure * 0.995;
+      const rawPressure = pressure * 0.01;
+      const cappedPressure = Math.max(-0.02, Math.min(0.02, rawPressure));
+      const pressureEffect = stock.current_price * cappedPressure;
+      const decayedPressure = pressure * 0.97; // Faster decay (was 0.995)
 
-      const newPrice = Math.max(0.01, stock.current_price + priceChange + pressureEffect);
+      // Apply persistent news impacts (Fix #4)
+      let newsForce = 0;
+      for (const impact of this.activeImpacts) {
+        if (impact.stockId === stock.id && impact.remainingTicks > 0) {
+          // Linear decay: force weakens as ticks decrease
+          const decayRatio = impact.remainingTicks / impact.totalTicks;
+          newsForce += impact.magnitude * decayRatio;
+          impact.remainingTicks--;
+        }
+      }
+      // Clean up expired impacts
+      this.activeImpacts = this.activeImpacts.filter(i => i.remainingTicks > 0);
+
+      const newPrice = Math.max(0.01, stock.current_price + priceChange + pressureEffect + newsForce);
       const percentChange = ((newPrice - stock.starting_price) / stock.starting_price) * 100;
 
       await stmts.updateStockPrice(newPrice, decayedPressure, stock.id);

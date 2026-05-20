@@ -863,7 +863,7 @@
       const res = await fetch('/api/admin/registrations');
       const data = await res.json();
       renderPendingList(data.pending);
-      renderApprovedList(data.approved);
+      renderApprovedList(data.all || data.approved);
     } catch { showToast('FAILED TO LOAD', 'error'); }
   }
 
@@ -887,23 +887,32 @@
     `).join('');
   }
 
-  function renderApprovedList(approved) {
+  function renderApprovedList(participants) {
     const container = $('#approved-list');
-    if (approved.length === 0) {
+    // Filter to only show approved and deactivated users
+    const visible = (participants || []).filter(u => u.status === 'approved' || u.status === 'deactivated');
+    if (visible.length === 0) {
       container.innerHTML = '<div class="empty-state"><p>// NO APPROVED</p></div>';
       return;
     }
-    container.innerHTML = approved.map(u => `
-      <div class="reg-card">
+    container.innerHTML = visible.map(u => {
+      const isDeactivated = u.status === 'deactivated';
+      return `
+      <div class="reg-card" style="${isDeactivated ? 'opacity: 0.6; border-left: 3px solid var(--red-primary);' : ''}">
         <div class="user-info">
           <h4>${escapeHtml(u.name)}</h4>
           <span>@${escapeHtml(u.username)}</span>
         </div>
         <div class="user-actions">
-          <span class="status-badge running"><span class="status-dot"></span>[ ACTIVE ]</span>
+          ${isDeactivated
+            ? `<span class="status-badge stopped" style="margin-right:0.5rem"><span class="status-dot"></span>[ DEACTIVATED ]</span>
+               <button class="btn btn-success btn-sm" onclick="reactivateUser(${u.id})">[ REACTIVATE ]</button>`
+            : `<span class="status-badge running" style="margin-right:0.5rem"><span class="status-dot"></span>[ ACTIVE ]</span>
+               <button class="btn btn-danger btn-sm" onclick="deactivateUser(${u.id})">[ DEACTIVATE ]</button>`
+          }
         </div>
       </div>
-    `).join('');
+    `}).join('');
   }
 
   window.approveUser = async function(id) {
@@ -920,6 +929,23 @@
       const res = await fetch(`/api/admin/registrations/${id}/reject`, { method: 'POST' });
       const data = await res.json();
       if (data.success) { showToast('[ REJECTED ]', 'info'); loadRegistrations(); }
+    } catch { showToast('FAILED', 'error'); }
+  };
+
+  window.deactivateUser = async function(id) {
+    if (!confirm('Deactivate this user? They will be unable to log in.')) return;
+    try {
+      const res = await fetch(`/api/admin/registrations/${id}/deactivate`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) { showToast('[ DEACTIVATED ]', 'warning'); loadRegistrations(); }
+    } catch { showToast('FAILED', 'error'); }
+  };
+
+  window.reactivateUser = async function(id) {
+    try {
+      const res = await fetch(`/api/admin/registrations/${id}/reactivate`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) { showToast('[ REACTIVATED ]', 'success'); loadRegistrations(); }
     } catch { showToast('FAILED', 'error'); }
   };
 

@@ -120,6 +120,14 @@ async function initDB() {
     CREATE INDEX IF NOT EXISTS idx_sim_participants ON simulation_participants(simulation_id);
   `);
 
+  // Migration: Add 'deactivated' to user status options
+  try {
+    await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check`);
+    await pool.query(`ALTER TABLE users ADD CONSTRAINT users_status_check CHECK(status IN ('pending','approved','rejected','deactivated'))`);
+  } catch (e) {
+    // Constraint may already be updated — ignore
+  }
+
   console.log('  ✅ PostgreSQL schema initialized');
 }
 
@@ -155,6 +163,8 @@ const stmts = {
   getAllParticipants: () => queryAll("SELECT id, username, name, email, status, created_at FROM users WHERE role = 'participant'"),
   approveUser: (id) => execute("UPDATE users SET status = 'approved' WHERE id = $1 AND role = 'participant'", [id]),
   rejectUser: (id) => execute("UPDATE users SET status = 'rejected' WHERE id = $1 AND role = 'participant'", [id]),
+  deactivateUser: (id) => execute("UPDATE users SET status = 'deactivated' WHERE id = $1 AND role = 'participant'", [id]),
+  reactivateUser: (id) => execute("UPDATE users SET status = 'approved' WHERE id = $1 AND role = 'participant' AND status = 'deactivated'", [id]),
 
   // Simulations
   createSimulation: async (p) => execute(

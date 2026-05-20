@@ -106,6 +106,10 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(403).json({ error: 'Your registration has been rejected' });
     }
 
+    if (user.role === 'participant' && user.status === 'deactivated') {
+      return res.status(403).json({ error: 'Your account has been deactivated. Please contact the administrator.' });
+    }
+
     req.session.userId = user.id;
     req.session.role = user.role;
     req.session.username = user.username;
@@ -466,6 +470,16 @@ app.post('/api/admin/registrations/:id/approve', requireAdmin, async (req, res) 
 
 app.post('/api/admin/registrations/:id/reject', requireAdmin, async (req, res) => {
   await stmts.rejectUser(parseInt(req.params.id));
+  res.json({ success: true });
+});
+
+app.post('/api/admin/registrations/:id/deactivate', requireAdmin, async (req, res) => {
+  await stmts.deactivateUser(parseInt(req.params.id));
+  res.json({ success: true });
+});
+
+app.post('/api/admin/registrations/:id/reactivate', requireAdmin, async (req, res) => {
+  await stmts.reactivateUser(parseInt(req.params.id));
   res.json({ success: true });
 });
 
