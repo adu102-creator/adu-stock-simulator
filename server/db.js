@@ -128,6 +128,17 @@ async function initDB() {
     // Constraint may already be updated — ignore
   }
 
+  // Migration: Create simulation_registrations table for per-simulation registration
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS simulation_registrations (
+      simulation_id INTEGER NOT NULL REFERENCES simulations(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+      created_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (simulation_id, user_id)
+    );
+  `);
+
   console.log('  ✅ PostgreSQL schema initialized');
 }
 
@@ -183,6 +194,7 @@ const stmts = {
     await pool.query('DELETE FROM news WHERE simulation_id = $1', [simId]);
     await pool.query('DELETE FROM stocks WHERE simulation_id = $1', [simId]);
     await pool.query('DELETE FROM simulation_participants WHERE simulation_id = $1', [simId]);
+    await pool.query('DELETE FROM simulation_registrations WHERE simulation_id = $1', [simId]);
     await pool.query('DELETE FROM simulations WHERE id = $1', [simId]);
   },
   updateSimulation: (p) => execute(
@@ -217,6 +229,32 @@ const stmts = {
   ),
   setAllParticipantsReportVisible: (simId) => execute(
     'UPDATE simulation_participants SET report_visible = 1 WHERE simulation_id = $1', [simId]
+  ),
+
+  // Simulation Registrations (per-sim registration)
+  registerForSim: (simId, userId) => execute(
+    "INSERT INTO simulation_registrations (simulation_id, user_id, status) VALUES ($1,$2,'pending') ON CONFLICT (simulation_id, user_id) DO NOTHING RETURNING simulation_id",
+    [simId, userId]
+  ),
+  getSimRegistrations: (simId) => queryAll(
+    'SELECT sr.*, u.username, u.name, u.email FROM simulation_registrations sr JOIN users u ON sr.user_id = u.id WHERE sr.simulation_id = $1 ORDER BY sr.created_at ASC',
+    [simId]
+  ),
+  getSimRegistration: (simId, userId) => queryOne(
+    'SELECT * FROM simulation_registrations WHERE simulation_id = $1 AND user_id = $2', [simId, userId]
+  ),
+  updateSimRegistration: (status, simId, userId) => execute(
+    'UPDATE simulation_registrations SET status = $1 WHERE simulation_id = $2 AND user_id = $3', [status, simId, userId]
+  ),
+  getApprovedSimRegistrations: (simId) => queryAll(
+    'SELECT sr.*, u.username, u.name FROM simulation_registrations sr JOIN users u ON sr.user_id = u.id WHERE sr.simulation_id = $1 AND sr.status = \'approved\'',
+    [simId]
+  ),
+  getRegistrableSimulations: (userId) => queryAll(
+    `SELECT s.*, 
+      (SELECT sr.status FROM simulation_registrations sr WHERE sr.simulation_id = s.id AND sr.user_id = $1) as reg_status
+     FROM simulations s WHERE s.status = 'not_started' ORDER BY s.created_at DESC`,
+    [userId]
   ),
 
   // Stocks

@@ -32,6 +32,8 @@
   let priceChart = null;
   let newsList = [];
   let lastRank = null; // Track leaderboard position for change popups
+  let portfolioHistory = []; // {time, value} snapshots for chart
+  let portfolioChart = null;
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -84,6 +86,7 @@
       if (btn.dataset.tab === 'portfolio-tab') loadPortfolio();
       if (btn.dataset.tab === 'leaderboard-tab') loadLeaderboard();
       if (btn.dataset.tab === 'archive-tab') loadArchives();
+      if (btn.dataset.tab === 'register-tab') loadAvailableSimulations();
     });
   });
 
@@ -129,6 +132,16 @@
     if (state.status === 'stopped') {
       showStatusBanner('// SIMULATION ENDED — check the ARCHIVE tab for results and AI reports.', 'stopped');
       statusIndicator.innerHTML = '<span class="status-badge stopped">[ ENDED ]</span>';
+      $('#sim-name').textContent = state.name || '—';
+      $('#current-day').textContent = `${state.current_day}/${state.total_days}`;
+      setTradingEnabled(false);
+      return;
+    }
+
+    // Spectator state: simulation is running/paused/active but user is not a participant
+    if (state.status === 'running' && !state.isParticipant) {
+      showStatusBanner('// SPECTATING — you are not registered or approved for this active simulation.', 'idle');
+      statusIndicator.innerHTML = '<span class="status-badge paused">[ SPECTATING ]</span>';
       $('#sim-name').textContent = state.name || '—';
       $('#current-day').textContent = `${state.current_day}/${state.total_days}`;
       setTradingEnabled(false);
@@ -569,7 +582,101 @@
     }).join('');
   }
 
+  // ═══ PORTFOLIO PERFORMANCE CHART ═══════════════════════════
+
+  function updatePortfolioChart() {
+    if (portfolioHistory.length < 2) return;
+
+    const ctx = document.getElementById('portfolio-perf-chart');
+    if (!ctx) return;
+
+    const labels = portfolioHistory.map(p => `D${parseFloat(p.time).toFixed(1)}`);
+    const values = portfolioHistory.map(p => p.value);
+    const startingCash = simState ? (simState.starting_cash || values[0]) : values[0];
+
+    // Determine if profit or loss for color
+    const latestVal = values[values.length - 1];
+    const isProfit = latestVal >= startingCash;
+    const lineColor = isProfit ? '#00e676' : '#ff5252';
+    const fillColor = isProfit ? 'rgba(0,230,118,0.08)' : 'rgba(255,82,82,0.08)';
+
+    if (portfolioChart) {
+      portfolioChart.data.labels = labels;
+      portfolioChart.data.datasets[0].data = values;
+      portfolioChart.data.datasets[0].borderColor = lineColor;
+      portfolioChart.data.datasets[0].backgroundColor = fillColor;
+      // Update reference line
+      if (portfolioChart.data.datasets[1]) {
+        portfolioChart.data.datasets[1].data = new Array(labels.length).fill(startingCash);
+      }
+      portfolioChart.update('none');
+      return;
+    }
+
+    portfolioChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Portfolio Value',
+          data: values,
+          borderColor: lineColor,
+          backgroundColor: fillColor,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: lineColor,
+        }, {
+          label: 'Starting Cash',
+          data: new Array(labels.length).fill(startingCash),
+          borderColor: 'rgba(255,255,255,0.15)',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#010b13',
+            titleColor: '#00aaff',
+            bodyColor: '#00e5ff',
+            borderColor: '#003a5c',
+            borderWidth: 1,
+            titleFont: { family: "'Source Code Pro', monospace", size: 11 },
+            bodyFont: { family: "'Source Code Pro', monospace", size: 11 },
+            callbacks: {
+              label: (ctx) => `₹${ctx.parsed.y.toLocaleString('en-IN', {maximumFractionDigits: 0})}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#1a4f6e', font: { family: "'Source Code Pro', monospace", size: 9 }, maxTicksLimit: 10 },
+            grid: { color: 'rgba(0, 58, 92, 0.15)' }
+          },
+          y: {
+            ticks: {
+              color: '#1a4f6e',
+              font: { family: "'Source Code Pro', monospace", size: 9 },
+              callback: (v) => '₹' + (v / 1000).toFixed(0) + 'K'
+            },
+            grid: { color: 'rgba(0, 58, 92, 0.15)' }
+          }
+        },
+        interaction: { intersect: false, mode: 'index' }
+      }
+    });
+  }
+
   // ═══ NEWS FEED ═════════════════════════════════════════════
+
 
   async function loadNews() {
     try {
@@ -601,6 +708,64 @@
       `;
     }).join('');
   }
+
+  // ═══ PER-SIMULATION REGISTRATION ═══════════════════════════
+
+  async function loadAvailableSimulations() {
+    try {
+      const res = await fetch('/api/participant/available-simulations');
+      const sims = await res.json();
+      renderAvailableSimulations(sims);
+    } catch { }
+  }
+
+  function renderAvailableSimulations(sims) {
+    const container = $('#available-sims-list');
+    if (!sims || sims.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>// no simulations open for registration</p></div>';
+      return;
+    }
+
+    container.innerHTML = sims.map(s => {
+      const regStatus = s.reg_status;
+      let actionHtml = '';
+
+      if (regStatus === 'approved') {
+        actionHtml = '<span class="status-badge" style="background:rgba(0,200,80,0.1);color:#00c850;border:1px solid rgba(0,200,80,0.3);padding:0.2rem 0.6rem;font-size:0.6rem;">✓ APPROVED</span>';
+      } else if (regStatus === 'pending') {
+        actionHtml = '<span class="status-badge" style="background:rgba(255,200,0,0.1);color:#ffaa00;border:1px solid rgba(255,200,0,0.3);padding:0.2rem 0.6rem;font-size:0.6rem;">⏳ PENDING</span>';
+      } else if (regStatus === 'rejected') {
+        actionHtml = '<span class="status-badge" style="background:rgba(255,50,50,0.1);color:#ff5252;border:1px solid rgba(255,50,50,0.3);padding:0.2rem 0.6rem;font-size:0.6rem;">✕ REJECTED</span>';
+      } else {
+        actionHtml = `<button class="btn btn-primary btn-sm" onclick="registerForSim(${s.id})" style="font-size:0.6rem;padding:0.2rem 0.6rem;">[ REGISTER ]</button>`;
+      }
+
+      return `
+        <div class="sim-card" style="cursor:default; margin-bottom:0.5rem;">
+          <div class="sim-card-info">
+            <h4>${escapeHtml(s.name)}</h4>
+            <span>${s.total_days} days // ₹${Number(s.starting_cash).toLocaleString('en-IN')} starting cash</span>
+          </div>
+          <div class="sim-card-actions">
+            ${actionHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.registerForSim = async function(simId) {
+    try {
+      const res = await fetch(`/api/participant/simulations/${simId}/register`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast('[ REGISTERED ] Waiting for admin approval', 'info');
+        loadAvailableSimulations();
+      } else {
+        showToast(data.error || 'Registration failed', 'error');
+      }
+    } catch { showToast('REGISTRATION FAILED', 'error'); }
+  };
 
   // ═══ ARCHIVES & LEARNING REPORTS ═══════════════════════════
 
@@ -787,7 +952,16 @@
         }
       });
       $('#holdings-value').textContent = `₹${holdingsVal.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
-      $('#total-value').textContent = `₹${(portfolio.cash + holdingsVal).toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+      const totalVal = portfolio.cash + holdingsVal;
+      $('#total-value').textContent = `₹${totalVal.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+
+      // Track portfolio value for chart (snapshot every update)
+      const simDay = simState ? (simState.simDay || simState.current_day || 1) : 1;
+      portfolioHistory.push({ time: simDay, value: totalVal });
+      // Keep max 500 points
+      if (portfolioHistory.length > 500) portfolioHistory.shift();
+      // Update chart every 3rd snapshot
+      if (portfolioHistory.length % 3 === 0) updatePortfolioChart();
     }
   });
 

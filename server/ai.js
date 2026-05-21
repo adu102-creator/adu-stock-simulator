@@ -260,17 +260,34 @@ async function claudeSuggest(stocks, sentiment, strength) {
  * Analyze a news headline. Tries Gemini first, then Claude, then keyword fallback.
  */
 async function analyzeHeadline(headline, availableIndustries, stockContext = [], intendedStrength = null) {
+  let result = null;
+
   // 1. Try Gemini (primary)
   const geminiResult = await geminiAnalyze(headline, availableIndustries, stockContext, intendedStrength);
-  if (geminiResult) return geminiResult;
+  if (geminiResult) {
+    result = geminiResult;
+  } else {
+    // 2. Try Claude (secondary)
+    const claudeResult = await claudeAnalyze(headline, availableIndustries, stockContext, intendedStrength);
+    if (claudeResult) {
+      result = claudeResult;
+    } else {
+      // 3. Keyword fallback (always available)
+      console.warn('⚠️  No AI API keys configured — using keyword fallback analysis');
+      result = fallbackAnalysis(headline, availableIndustries, intendedStrength);
+    }
+  }
 
-  // 2. Try Claude (secondary)
-  const claudeResult = await claudeAnalyze(headline, availableIndustries, stockContext, intendedStrength);
-  if (claudeResult) return claudeResult;
+  // Force all impacts to have the intended strength if it was specified
+  if (result && intendedStrength) {
+    if (result.impacts && Array.isArray(result.impacts)) {
+      result.impacts.forEach(imp => {
+        imp.strength = intendedStrength;
+      });
+    }
+  }
 
-  // 3. Keyword fallback (always available)
-  console.warn('⚠️  No AI API keys configured — using keyword fallback analysis');
-  return fallbackAnalysis(headline, availableIndustries);
+  return result;
 }
 
 /**
@@ -294,7 +311,7 @@ async function generateNewsSuggestions(stocks, sentiment, strength) {
 // Keyword Fallback Analysis (no API needed)
 // ============================================================
 
-function fallbackAnalysis(headline, availableIndustries) {
+function fallbackAnalysis(headline, availableIndustries, intendedStrength = null) {
   const lower = headline.toLowerCase();
   const impacts = [];
 

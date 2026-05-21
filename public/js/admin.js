@@ -210,6 +210,7 @@
     const state = (simState.id === id) ? simState : sim;
     updateSimUI({ ...state, id });
     updateActiveSimPanel();
+    loadSimRegistrations(id);
   };
 
   window.deleteSimulation = async function(id, name) {
@@ -229,6 +230,87 @@
       }
     } catch { showToast('DELETE FAILED', 'error'); }
   };
+
+  // ═══ PER-SIMULATION REGISTRATIONS ═══════════════════════════
+
+  async function loadSimRegistrations(simId) {
+    const container = $('#sim-reg-list');
+    if (!simId) { container.innerHTML = ''; return; }
+    try {
+      const res = await fetch(`/api/admin/simulations/${simId}/registrations`);
+      const regs = await res.json();
+      renderSimRegistrations(simId, regs);
+    } catch { container.innerHTML = '<span style="color:var(--text-muted)">// failed to load</span>'; }
+  }
+
+  function renderSimRegistrations(simId, regs) {
+    const container = $('#sim-reg-list');
+    if (!regs || regs.length === 0) {
+      container.innerHTML = '<span style="color:var(--text-muted)">// no registrations yet — participants must register from their dashboard</span>';
+      return;
+    }
+
+    container.innerHTML = regs.map(r => {
+      const statusColors = {
+        pending: 'color:#ffaa00;',
+        approved: 'color:#00c850;',
+        rejected: 'color:#ff5252;'
+      };
+      const statusLabels = {
+        pending: '⏳ PENDING',
+        approved: '✓ APPROVED',
+        rejected: '✕ REJECTED'
+      };
+
+      let actions = '';
+      if (r.status === 'pending') {
+        actions = `
+          <button class="btn btn-success btn-sm" onclick="approveSimReg(${simId},${r.user_id})" style="font-size:0.5rem;padding:0.1rem 0.3rem;margin-left:0.3rem;">APPROVE</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectSimReg(${simId},${r.user_id})" style="font-size:0.5rem;padding:0.1rem 0.3rem;margin-left:0.2rem;">REJECT</button>
+        `;
+      } else if (r.status === 'rejected') {
+        actions = `<button class="btn btn-success btn-sm" onclick="approveSimReg(${simId},${r.user_id})" style="font-size:0.5rem;padding:0.1rem 0.3rem;margin-left:0.3rem;">APPROVE</button>`;
+      }
+
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.35rem 0.5rem;border-bottom:1px solid rgba(0,58,92,0.15);">
+          <div>
+            <strong style="color:var(--text-primary);">${escapeHtml(r.name)}</strong>
+            <span style="color:var(--text-muted);margin-left:0.4rem;">@${escapeHtml(r.username)}</span>
+          </div>
+          <div style="display:flex;align-items:center;">
+            <span style="font-size:0.55rem;font-weight:700;${statusColors[r.status]}">${statusLabels[r.status]}</span>
+            ${actions}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.approveSimReg = async function(simId, userId) {
+    try {
+      await fetch(`/api/admin/simulations/${simId}/registrations/${userId}/approve`, { method: 'POST' });
+      showToast('[ APPROVED ]', 'success');
+      loadSimRegistrations(simId);
+    } catch { showToast('APPROVE FAILED', 'error'); }
+  };
+
+  window.rejectSimReg = async function(simId, userId) {
+    try {
+      await fetch(`/api/admin/simulations/${simId}/registrations/${userId}/reject`, { method: 'POST' });
+      showToast('[ REJECTED ]', 'warning');
+      loadSimRegistrations(simId);
+    } catch { showToast('REJECT FAILED', 'error'); }
+  };
+
+  $('#btn-approve-all-regs').addEventListener('click', async () => {
+    if (!selectedSimId) return;
+    try {
+      await fetch(`/api/admin/simulations/${selectedSimId}/registrations/approve-all`, { method: 'POST' });
+      showToast('[ ALL APPROVED ]', 'success');
+      loadSimRegistrations(selectedSimId);
+    } catch { showToast('APPROVE ALL FAILED', 'error'); }
+  });
 
   // Create simulation
   $('#btn-create-sim').addEventListener('click', async () => {

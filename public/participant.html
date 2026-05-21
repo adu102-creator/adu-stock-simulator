@@ -82,6 +82,7 @@
         <button class="tab-btn active" data-tab="stocks-tab" id="tab-btn-stocks">STOCKS</button>
         <button class="tab-btn" data-tab="portfolio-tab" id="tab-btn-portfolio">PORTFOLIO</button>
         <button class="tab-btn" data-tab="leaderboard-tab" id="tab-btn-leaderboard">LEADERBOARD</button>
+        <button class="tab-btn" data-tab="register-tab" id="tab-btn-register">REGISTER</button>
         <button class="tab-btn" data-tab="archive-tab" id="tab-btn-archive">ARCHIVE</button>
       </nav>
 
@@ -96,6 +97,10 @@
 
       <!-- Tab Content: Portfolio -->
       <div class="tab-content" id="portfolio-tab">
+        <h3 class="section-title">PORTFOLIO PERFORMANCE</h3>
+        <div class="glass-card portfolio-chart-container" style="margin-bottom: 1.5rem;">
+          <canvas id="portfolio-perf-chart"></canvas>
+        </div>
         <h3 class="section-title">YOUR HOLDINGS</h3>
         <div class="glass-card" style="margin-bottom: 1.5rem;">
           <div style="overflow-x: auto;">
@@ -158,6 +163,15 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: Register for Simulations -->
+      <div class="tab-content" id="register-tab">
+        <h3 class="section-title">AVAILABLE SIMULATIONS</h3>
+        <p style="font-size:0.7rem; color:var(--text-muted); margin-bottom:1rem; font-family:'Source Code Pro',monospace;">// Register for upcoming simulations. Admin will approve your registration before the sim starts.</p>
+        <div id="available-sims-list">
+          <div class="empty-state"><p>// loading...</p></div>
         </div>
       </div>
 

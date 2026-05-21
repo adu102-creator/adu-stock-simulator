@@ -78,9 +78,13 @@ class SimulationEngine {
     if (sim.status === 'not_started') {
       await stmts.resetSimStockPrices(simId);
 
-      const approvedUsers = await stmts.getApprovedUsers();
-      for (const user of approvedUsers) {
-        await stmts.addParticipant(simId, user.id, sim.starting_cash);
+      // Only add participants who registered AND were approved for THIS simulation
+      const approvedRegs = await stmts.getApprovedSimRegistrations(simId);
+      if (approvedRegs.length === 0) {
+        return { error: 'No approved participants. Approve registrations first.' };
+      }
+      for (const reg of approvedRegs) {
+        await stmts.addParticipant(simId, reg.user_id, sim.starting_cash);
       }
 
       for (const stock of stocks) {

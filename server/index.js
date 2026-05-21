@@ -569,6 +569,52 @@ app.get('/api/participant/portfolio', requireParticipant, async (req, res) => {
   });
 });
 
+// === Per-Simulation Registration (Participant) ===
+app.get('/api/participant/available-simulations', requireParticipant, async (req, res) => {
+  const sims = await stmts.getRegistrableSimulations(req.session.userId);
+  res.json(sims);
+});
+
+app.post('/api/participant/simulations/:simId/register', requireParticipant, async (req, res) => {
+  try {
+    const simId = parseInt(req.params.simId);
+    const sim = await stmts.getSimulation(simId);
+    if (!sim) return res.status(404).json({ error: 'Simulation not found' });
+    if (sim.status !== 'not_started') return res.status(400).json({ error: 'Registration is closed — simulation has already started' });
+
+    await stmts.registerForSim(simId, req.session.userId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// === Per-Simulation Registration (Admin) ===
+app.get('/api/admin/simulations/:simId/registrations', requireAdmin, async (req, res) => {
+  const regs = await stmts.getSimRegistrations(parseInt(req.params.simId));
+  res.json(regs);
+});
+
+app.post('/api/admin/simulations/:simId/registrations/:userId/approve', requireAdmin, async (req, res) => {
+  await stmts.updateSimRegistration('approved', parseInt(req.params.simId), parseInt(req.params.userId));
+  res.json({ success: true });
+});
+
+app.post('/api/admin/simulations/:simId/registrations/:userId/reject', requireAdmin, async (req, res) => {
+  await stmts.updateSimRegistration('rejected', parseInt(req.params.simId), parseInt(req.params.userId));
+  res.json({ success: true });
+});
+
+app.post('/api/admin/simulations/:simId/registrations/approve-all', requireAdmin, async (req, res) => {
+  const regs = await stmts.getSimRegistrations(parseInt(req.params.simId));
+  for (const reg of regs) {
+    if (reg.status === 'pending') {
+      await stmts.updateSimRegistration('approved', parseInt(req.params.simId), reg.user_id);
+    }
+  }
+  res.json({ success: true });
+});
+
 app.get('/api/participant/stocks', requireParticipant, async (req, res) => {
   const state = await simulation.getState();
   if (!state || !state.id) return res.json({ stocks: [], simState: { status: 'not_started' } });
