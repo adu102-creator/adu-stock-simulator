@@ -1502,15 +1502,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .stock-detail-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  flex-wrap: nowrap;
   gap: 0.75rem;
   margin-bottom: 1.25rem;
 }
 
 .detail-stat {
+  flex: 1 1 0;
+  min-width: 0;
   text-align: center;
-  padding: 0.6rem;
+  padding: 0.6rem 0.4rem;
   background: var(--bg-panel);
   border-radius: var(--radius);
   border: 1px solid var(--blue-border);
@@ -1948,7 +1950,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .top-bar { flex-wrap: wrap; gap: 0.4rem; padding: 0.6rem 0.85rem; }
   .top-bar-stats { gap: 0.85rem; }
   .stock-grid { grid-template-columns: 1fr; }
-  .stock-detail-stats { grid-template-columns: repeat(2, 1fr); }
+  /* stock-detail-stats uses flexbox — no override needed */
   .trade-panel { grid-template-columns: 1fr; }
 }
 
@@ -2000,4 +2002,56 @@ input[type="range"]::-webkit-slider-thumb:hover {
 @keyframes rankPopIn {
   from { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
   to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* Company Info Card (Redesigned Stock Detail Modal Component) */
+.company-info-card {
+  background: rgba(0, 170, 255, 0.04);
+  border: 1px solid rgba(0, 170, 255, 0.22);
+  border-radius: var(--radius, 6px);
+  padding: 0.85rem 1.1rem;
+  box-shadow: 0 0 15px rgba(0, 170, 255, 0.08), inset 0 0 10px rgba(0, 170, 255, 0.03);
+  transition: all 0.2s ease-in-out;
+  margin-top: 0.5rem;
+}
+
+.company-info-card:hover {
+  border-color: rgba(0, 170, 255, 0.35);
+  box-shadow: 0 0 20px rgba(0, 170, 255, 0.12), inset 0 0 12px rgba(0, 170, 255, 0.05);
+}
+
+.company-info-header {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--blue-bright, #00d4ff);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+.company-info-header .info-icon {
+  font-size: 0.7rem;
+  opacity: 0.95;
+}
+
+.company-info-header .company-industry {
+  color: var(--text-bright, #ffffff);
+  font-weight: 800;
+}
+
+.company-info-desc {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.72rem;
+  color: var(--text-primary, #a9b7c6);
+  line-height: 1.6;
+  text-align: left;
+}
+
+.company-info-wrapper {
+  margin-bottom: 1.25rem;
 }

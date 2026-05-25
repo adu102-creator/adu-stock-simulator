@@ -296,23 +296,20 @@
     $('#modal-percent-change').textContent = `${selectedStock.percentChange >= 0 ? '+' : ''}${selectedStock.percentChange.toFixed(2)}%`;
     $('#modal-percent-change').style.color = selectedStock.percentChange >= 0 ? 'var(--price-up)' : 'var(--price-down)';
 
-    // Stock info panel
-    let infoEl = $('#modal-stock-info');
-    if (!infoEl) {
-      infoEl = document.createElement('div');
-      infoEl.id = 'modal-stock-info';
-      const priceEl = $('#modal-current-price').closest('.modal-info-row') || $('#modal-current-price').parentElement;
-      priceEl.parentElement.insertBefore(infoEl, priceEl.nextSibling);
-    }
-    if (selectedStock.description) {
+    // Stock info panel — always show industry, optionally show description
+    const infoEl = $('#modal-stock-info');
+    if (infoEl) {
+      const descHtml = selectedStock.description
+        ? `<div class="company-info-desc">${selectedStock.description}</div>`
+        : '';
       infoEl.innerHTML = `
-        <div style="margin: 0.5rem 0 0.75rem; padding: 0.6rem 0.75rem; background: rgba(0,170,255,0.05); border: 1px solid rgba(0,170,255,0.15); border-radius: 4px;">
-          <div style="font-size: 0.6rem; color: var(--blue-primary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25rem; font-weight: 700;">ℹ️ ABOUT THIS COMPANY // ${selectedStock.industry}</div>
-          <div style="font-size: 0.72rem; color: var(--text-primary); line-height: 1.5; font-family: 'Source Code Pro', monospace;">${selectedStock.description}</div>
+        <div class="company-info-card">
+          <div class="company-info-header">
+            <span class="info-icon">ℹ️</span> ABOUT THIS COMPANY // <span class="company-industry">${(selectedStock.industry || 'GENERAL').toUpperCase()}</span>
+          </div>
+          ${descHtml}
         </div>
       `;
-    } else {
-      infoEl.innerHTML = '';
     }
 
     // Holdings
