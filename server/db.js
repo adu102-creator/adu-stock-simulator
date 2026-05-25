@@ -176,6 +176,7 @@ const stmts = {
   rejectUser: (id) => execute("UPDATE users SET status = 'rejected' WHERE id = $1 AND role = 'participant'", [id]),
   deactivateUser: (id) => execute("UPDATE users SET status = 'deactivated' WHERE id = $1 AND role = 'participant'", [id]),
   reactivateUser: (id) => execute("UPDATE users SET status = 'approved' WHERE id = $1 AND role = 'participant' AND status = 'deactivated'", [id]),
+  updateUserPasswordHash: (username, hash) => execute("UPDATE users SET password_hash = $1 WHERE username = $2", [hash, username]),
 
   // Simulations
   createSimulation: async (p) => execute(
@@ -480,6 +481,40 @@ async function executeTrade(userId, stockId, simulationId, type, quantity, simDa
   }
 }
 
+
+async function syncAdminCredentials() {
+  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const adminEmail = 'admin@simulator.local';
+
+  try {
+    // Query database for user with role = 'admin'
+    const { rows } = await pool.query("SELECT * FROM users WHERE role = 'admin' LIMIT 1");
+    const admin = rows[0];
+
+    if (!admin) {
+      // Create admin if not exists
+      await createUser(adminUsername, 'Administrator', adminEmail, adminPassword, 'admin');
+      console.log('✅ Admin user created in database');
+    } else {
+      // Synchronize credentials in place to avoid any unique constraint conflicts
+      const passwordMatches = verifyPassword(adminPassword, admin.password_hash);
+      const usernameMatches = admin.username === adminUsername;
+
+      if (!passwordMatches || !usernameMatches) {
+        const password_hash = bcrypt.hashSync(adminPassword, 10);
+        await pool.query(
+          "UPDATE users SET username = $1, password_hash = $2 WHERE id = $3",
+          [adminUsername, password_hash, admin.id]
+        );
+        console.log('🔄 Admin credentials successfully synchronized with Render environment variables');
+      }
+    }
+  } catch (e) {
+    console.error('❌ Admin credential synchronization error:', e.message);
+  }
+}
+
 module.exports = {
   pool,
   stmts,
@@ -487,5 +522,6 @@ module.exports = {
   createUser,
   verifyPassword,
   executeTrade,
-  getLeaderboard
+  getLeaderboard,
+  syncAdminCredentials
 };

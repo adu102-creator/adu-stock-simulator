@@ -5,7 +5,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
 const path = require('path');
-const { stmts, initDB, createUser, verifyPassword, executeTrade, getLeaderboard } = require('./db');
+const { stmts, initDB, createUser, verifyPassword, executeTrade, getLeaderboard, syncAdminCredentials } = require('./db');
 const SimulationEngine = require('./simulation');
 const { analyzeHeadline, generateNewsSuggestions, logAIStatus } = require('./ai');
 
@@ -791,22 +791,8 @@ async function startServer() {
   // Initialize database tables
   await initDB();
 
-  // Ensure admin user exists
-  try {
-    const admin = await stmts.getUserByUsername(process.env.ADMIN_USERNAME || 'admin');
-    if (!admin) {
-      await createUser(
-        process.env.ADMIN_USERNAME || 'admin',
-        'Administrator',
-        'admin@simulator.local',
-        process.env.ADMIN_PASSWORD || 'admin123',
-        'admin'
-      );
-      console.log('✅ Admin user created');
-    }
-  } catch (e) {
-    console.error('Admin init error:', e.message);
-  }
+  // Ensure admin user exists and matches environment variables
+  await syncAdminCredentials();
 
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`
