@@ -5,7 +5,8 @@
 :root {
   --holo-cyan: #00D4FF;
   --holo-mint: #00FFC6;
-  --holo-violet: #8A5CFF;
+  --holo-rose: #FF4D6D;
+  --holo-violet: #FF4D6D; /* Pointing to Rose for high contrast negative actions */
   --holo-white: #E0F4FF;
   --holo-bg: #050a18;
   --holo-panel: rgba(8, 20, 40, 0.7);

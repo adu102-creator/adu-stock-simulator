@@ -232,8 +232,9 @@
       const arrow = isPositive ? '↑' : '↓';
       const color = STOCK_COLORS[s.colorIndex % STOCK_COLORS.length];
 
-      const volLevel = 'MEDIUM'; // Placeholder
-      const volBars = 2;
+      const volVal = (s.volatility || 'medium').toLowerCase();
+      const volLevel = volVal.toUpperCase();
+      const volBars = volVal === 'low' ? 1 : (volVal === 'high' ? 3 : 2);
 
       const desc = s.description ? s.description.substring(0, 80) + (s.description.length > 80 ? '...' : '') : '';
 
@@ -242,10 +243,10 @@
              onclick="openStockModal(${s.id})" id="stock-card-${s.id}">
           <div class="stock-card-header">
             <div>
-              <div class="ticker" style="color: ${color}; text-shadow: 0 0 8px ${color}40;">${s.ticker}</div>
-              <div class="company-name">${s.name}</div>
+              <div class="ticker" style="color: ${color}; text-shadow: 0 0 8px ${color}40;">${escapeHtml(s.ticker)}</div>
+              <div class="company-name">${escapeHtml(s.name)}</div>
             </div>
-            <span class="industry-tag">${s.industry}</span>
+            <span class="industry-tag">${escapeHtml(s.industry)}</span>
           </div>
           <div class="stock-card-price" id="price-${s.id}">₹${s.price.toFixed(2)}</div>
           <div class="stock-card-change ${changeClass}">
@@ -510,15 +511,15 @@
 
       return `
         <tr>
-          <td class="ticker" style="color: var(--blue-bright); text-shadow: var(--text-glow-bright);">${h.ticker}</td>
-          <td style="color: var(--text-primary)">${h.stock_name}</td>
-          <td class="mono">${h.quantity}</td>
-          <td class="mono">₹${h.avg_price.toFixed(2)}</td>
-          <td class="mono">₹${h.current_price.toFixed(2)}</td>
-          <td class="mono" style="color: ${isPositive ? 'var(--price-up)' : 'var(--price-down)'}">
+          <td class="ticker text-left" style="color: var(--blue-bright); text-shadow: var(--text-glow-bright);">${escapeHtml(h.ticker)}</td>
+          <td class="text-left" style="color: var(--text-primary)">${escapeHtml(h.stock_name)}</td>
+          <td class="mono text-center">${h.quantity}</td>
+          <td class="mono text-right">₹${h.avg_price.toFixed(2)}</td>
+          <td class="mono text-right">₹${h.current_price.toFixed(2)}</td>
+          <td class="mono text-right" style="color: ${isPositive ? 'var(--price-up)' : 'var(--price-down)'}">
             ${isPositive ? '+' : ''}₹${pnl.toFixed(0)} (${isPositive ? '+' : ''}${pnlPct.toFixed(1)}%)
           </td>
-          <td class="mono" style="color: var(--blue-bright)">₹${value.toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+          <td class="mono text-right" style="color: var(--blue-bright)">₹${value.toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
         </tr>
       `;
     }).join('');
@@ -535,12 +536,12 @@
       const isBuy = t.type === 'buy';
       return `
         <tr>
-          <td><span class="impact-tag ${isBuy ? 'positive' : 'negative'}" style="font-size:0.6rem;">${isBuy ? '[ BUY ]' : '[ SELL ]'}</span></td>
-          <td class="ticker" style="color: var(--blue-bright)">${t.ticker}</td>
-          <td class="mono">${t.quantity}</td>
-          <td class="mono">₹${t.price.toFixed(2)}</td>
-          <td class="mono">₹${t.total.toFixed(0)}</td>
-          <td class="mono" style="color: var(--text-muted)">D${parseFloat(t.sim_day).toFixed(1)}</td>
+          <td class="text-left"><span class="impact-tag ${isBuy ? 'positive' : 'negative'}" style="font-size:0.6rem;">${isBuy ? '[ BUY ]' : '[ SELL ]'}</span></td>
+          <td class="ticker text-left" style="color: var(--blue-bright)">${escapeHtml(t.ticker)}</td>
+          <td class="mono text-center">${t.quantity}</td>
+          <td class="mono text-right">₹${t.price.toFixed(2)}</td>
+          <td class="mono text-right">₹${t.total.toFixed(0)}</td>
+          <td class="mono text-center" style="color: var(--text-muted)">D${parseFloat(t.sim_day).toFixed(1)}</td>
         </tr>
       `;
     }).join('');
@@ -569,11 +570,11 @@
 
       return `
         <tr style="${isMe ? 'background: rgba(0, 170, 255, 0.05);' : ''}">
-          <td><span class="rank-badge ${rankClass}">${p.rank}</span></td>
-          <td>
+          <td class="text-center"><span class="rank-badge ${rankClass}">${p.rank}</span></td>
+          <td class="text-left">
             <strong style="color: ${isMe ? 'var(--blue-bright)' : 'var(--text-primary)'}">${escapeHtml(p.name)}${isMe ? ' (you)' : ''}</strong>
           </td>
-          <td class="leaderboard-value">₹${p.totalValue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
+          <td class="leaderboard-value text-right" style="padding-right: 1.5rem;">₹${p.totalValue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</td>
         </tr>
       `;
     }).join('');
@@ -1079,7 +1080,8 @@
           percentChange: ((s.current_price - s.starting_price) / s.starting_price * 100),
           industry: s.industry,
           description: s.description || '',
-          colorIndex: s.color_index
+          colorIndex: s.color_index,
+          volatility: s.volatility || 'medium'
         };
       });
       renderStockGrid(Object.values(stockData));

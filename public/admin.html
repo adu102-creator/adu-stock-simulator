@@ -239,7 +239,7 @@
         </div>
 
         <div class="glass-card news-compose">
-          <h3 class="section-title">>_ COMPOSE HEADLINE</h3>
+          <h3 class="section-title">>_ COMPOSE HEADLINE<span id="ai-fallback-badge" style="display: none; margin-left: 1rem; padding: 0.15rem 0.5rem; background: rgba(255, 159, 28, 0.1); color: #ff9f1c; border: 1px solid rgba(255, 159, 28, 0.3); font-size: 0.6rem; font-family: 'Source Code Pro', monospace; font-weight: 700;">⚠️ AI LIMIT: KEYWORD FALLBACK ACTIVE</span></h3>
           <div class="form-group" style="margin-bottom: 1rem;">
             <label for="news-headline">HEADLINE</label>
             <textarea id="news-headline" class="form-input" placeholder=">_ Government announces new subsidies for renewable energy sector" rows="3"></textarea>
@@ -325,7 +325,7 @@
           <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
             <button class="btn btn-ghost" id="btn-analyze-news">[ AI ANALYZE ]</button>
             <button class="btn btn-primary" id="btn-publish-news">[ PUBLISH ]</button>
-            <button class="btn btn-primary" id="btn-schedule-news" disabled style="display: none;">[ ADD TO QUEUE ]</button>
+            <button class="btn btn-primary" id="btn-schedule-news" style="display: none;">[ ADD TO QUEUE ]</button>
           </div>
 
           <!-- AI Impact Preview — Terminal Output Style -->

@@ -5,6 +5,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 const { stmts, initDB, createUser, verifyPassword, executeTrade, getLeaderboard, syncAdminCredentials } = require('./db');
 const SimulationEngine = require('./simulation');
 const { analyzeHeadline, generateNewsSuggestions, logAIStatus } = require('./ai');
@@ -20,16 +22,54 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
+// ─── Security Headers ──────────────────────────────────────────
+app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled to allow CDN scripts
+
+// ─── Rate Limiting ─────────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again after 15 minutes.' }
+});
+
+const tradeLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minute
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Trading too fast. Please slow down.' }
+});
+
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again shortly.' }
+});
+
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/participant/trade', tradeLimiter);
+app.use('/api/', globalLimiter);
+
 // ─── Session Setup ─────────────────────────────────────────────
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'default-secret-change-me',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
 });
 
 app.use(sessionMiddleware);
-app.use(express.json());
+app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Share session with Socket.IO
@@ -37,8 +77,29 @@ io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
 });
 
+// Reject unauthenticated socket connections
+io.use((socket, next) => {
+  const session = socket.request.session;
+  if (!session || !session.userId) {
+    return next(new Error('Authentication required'));
+  }
+  next();
+});
+
 // ─── Initialize Simulation Engine ──────────────────────────────
 const simulation = new SimulationEngine(io);
+
+// ─── Utility: Strict integer parser ────────────────────────────
+function parseId(val) {
+  const n = Number(val);
+  if (!Number.isInteger(n) || n <= 0) return NaN;
+  return n;
+}
+
+// ─── Failed Login Tracker ──────────────────────────────────────
+const failedLogins = new Map(); // username -> { count, lockedUntil }
+const MAX_FAILED_LOGINS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 // ─── Auth Middleware ────────────────────────────────────────────
 function requireAuth(req, res, next) {
@@ -74,6 +135,27 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
+    // Input type and length validation
+    if (typeof username !== 'string' || typeof name !== 'string' ||
+        typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Invalid input types' });
+    }
+    if (username.length > 30 || name.length > 60 || email.length > 100 || password.length > 128) {
+      return res.status(400).json({ error: 'Input exceeds maximum length' });
+    }
+    if (username.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+    if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+      return res.status(400).json({ error: 'Username can only contain letters, numbers, dots, hyphens, and underscores' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
     if (await stmts.getUserByUsername(username)) {
       return res.status(400).json({ error: 'Username already taken' });
     }
@@ -92,11 +174,36 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    if (username.length > 30 || password.length > 128) {
+      return res.status(400).json({ error: 'Invalid input length' });
+    }
+
+    // Check account lockout
+    const lockRecord = failedLogins.get(username);
+    if (lockRecord && lockRecord.lockedUntil > Date.now()) {
+      const mins = Math.ceil((lockRecord.lockedUntil - Date.now()) / 60000);
+      return res.status(429).json({ error: `Account locked. Try again in ${mins} minutes.` });
+    }
+
     const user = await stmts.getUserByUsername(username);
 
     if (!user || !verifyPassword(password, user.password_hash)) {
+      // Track failed attempt
+      const current = failedLogins.get(username) || { count: 0, lockedUntil: 0 };
+      current.count += 1;
+      if (current.count >= MAX_FAILED_LOGINS) {
+        current.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+        current.count = 0;
+      }
+      failedLogins.set(username, current);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    // Clear failed attempts on success
+    failedLogins.delete(username);
 
     if (user.role === 'participant' && user.status === 'pending') {
       return res.status(403).json({ error: 'Your registration is still pending approval' });
@@ -110,19 +217,26 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(403).json({ error: 'Your account has been deactivated. Please contact the administrator.' });
     }
 
-    req.session.userId = user.id;
-    req.session.role = user.role;
-    req.session.username = user.username;
-
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-        status: user.status
+    // Regenerate session to prevent session fixation
+    req.session.regenerate((err) => {
+      if (err) {
+        console.error('Session regeneration error:', err);
+        return res.status(500).json({ error: 'Login failed' });
       }
+      req.session.userId = user.id;
+      req.session.role = user.role;
+      req.session.username = user.username;
+
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: user.role,
+          status: user.status
+        }
+      });
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -176,7 +290,8 @@ app.post('/api/admin/simulations', requireAdmin, async (req, res) => {
 
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Simulation create error:', error);
+    res.status(500).json({ error: 'Failed to create simulation' });
   }
 });
 
@@ -253,7 +368,8 @@ app.post('/api/admin/simulation/:id/release-report', requireAdmin, async (req, r
     await stmts.releaseReport(new Date().toISOString(), simId);
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Report release error:', error);
+    res.status(500).json({ error: 'Failed to release report' });
   }
 });
 
@@ -300,7 +416,8 @@ app.post('/api/admin/simulations/:simId/stocks', requireAdmin, async (req, res) 
     if (error.message && error.message.includes('unique')) {
       return res.status(400).json({ error: 'Ticker symbol already exists in this simulation' });
     }
-    res.status(500).json({ error: error.message });
+    console.error('Stock create error:', error);
+    res.status(500).json({ error: 'Failed to create stock' });
   }
 });
 
@@ -309,7 +426,8 @@ app.delete('/api/admin/stocks/:id', requireAdmin, async (req, res) => {
     await stmts.deleteStock(parseInt(req.params.id));
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Stock delete error:', error);
+    res.status(500).json({ error: 'Failed to delete stock' });
   }
 });
 
@@ -530,7 +648,8 @@ app.get('/api/admin/simulations/:simId/report', requireAdmin, async (req, res) =
       leaderboard,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Simulation query error:', error);
+    res.status(500).json({ error: 'Failed to load simulation data' });
   }
 });
 
@@ -641,12 +760,31 @@ app.post('/api/participant/trade', requireParticipant, async (req, res) => {
       return res.status(400).json({ error: 'stockId, type, and quantity are required' });
     }
 
+    // Whitelist trade type
+    if (type !== 'buy' && type !== 'sell') {
+      return res.status(400).json({ error: 'Trade type must be "buy" or "sell"' });
+    }
+
+    // Type safety for stockId
+    if (typeof stockId !== 'number' && typeof stockId !== 'string') {
+      return res.status(400).json({ error: 'Invalid stockId' });
+    }
+
+    // Validate and cap quantity
+    const parsedQty = Number(quantity);
+    if (!Number.isInteger(parsedQty) || parsedQty <= 0) {
+      return res.status(400).json({ error: 'Quantity must be a positive whole number' });
+    }
+    if (parsedQty > 500) {
+      return res.status(400).json({ error: 'Maximum 500 shares per trade' });
+    }
+
     const result = await executeTrade(
       req.session.userId,
-      parseInt(stockId),
+      parseId(stockId),
       state.id,
       type,
-      parseInt(quantity),
+      parsedQty,
       state.simDay
     );
 
@@ -692,7 +830,8 @@ app.get('/api/participant/archives', requireParticipant, async (req, res) => {
     }
     res.json(userSims);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Archive load error:', error);
+    res.status(500).json({ error: 'Failed to load archives' });
   }
 });
 
@@ -721,7 +860,8 @@ app.get('/api/participant/archives/:simId/report', requireParticipant, async (re
       leaderboard,
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Report load error:', error);
+    res.status(500).json({ error: 'Failed to load report' });
   }
 });
 
@@ -732,7 +872,8 @@ app.get('/api/participant/archives/:simId/leaderboard', requireParticipant, asyn
     if (!sp) return res.status(403).json({ error: 'Not part of this simulation' });
     res.json(await getLeaderboard(simId));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Leaderboard load error:', error);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });
 
@@ -788,6 +929,15 @@ app.get('/register', (req, res) => {
 
 // ─── Start Server ──────────────────────────────────────────────
 async function startServer() {
+  // ─── Enforce required environment variables ────────────────
+  const required = ['DATABASE_URL', 'SESSION_SECRET', 'ADMIN_USERNAME', 'ADMIN_PASSWORD'];
+  const missing = required.filter(k => !process.env[k]);
+  if (missing.length > 0) {
+    console.error(`\n❌ FATAL: Missing required environment variables: ${missing.join(', ')}`);
+    console.error('   Set these in your .env file or Render environment settings.\n');
+    process.exit(1);
+  }
+
   // Initialize database tables
   await initDB();
 
@@ -801,7 +951,7 @@ async function startServer() {
   ║                                              ║
   ║  🌐 http://localhost:${PORT}                    ║
   ║  👤 Admin: ${(process.env.ADMIN_USERNAME || 'admin').padEnd(30)}║
-  ║  🔑 Password: ${(process.env.ADMIN_PASSWORD || 'admin123').padEnd(27)}║
+  ║  🔑 Password: ●●●●●●●●                       ║
   ╚══════════════════════════════════════════════╝
     `);
 

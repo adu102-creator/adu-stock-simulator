@@ -3,7 +3,9 @@ const bcrypt = require('bcryptjs');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: process.env.NODE_ENV === 'production'
+    ? { rejectUnauthorized: true }
+    : { rejectUnauthorized: false }
 });
 
 // ─── Schema ────────────────────────────────────────────────────
@@ -483,8 +485,12 @@ async function executeTrade(userId, stockId, simulationId, type, quantity, simDa
 
 
 async function syncAdminCredentials() {
-  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminUsername || !adminPassword) {
+    console.warn('⚠️  ADMIN_USERNAME or ADMIN_PASSWORD not set. Skipping admin sync.');
+    return;
+  }
   const adminEmail = 'admin@simulator.local';
 
   try {

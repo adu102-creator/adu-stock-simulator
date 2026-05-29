@@ -54,7 +54,7 @@
       if (item.dataset.panel === 'stocks') { populateSimSelectors(); loadStocks(); }
       if (item.dataset.panel === 'registrations') loadRegistrations();
       if (item.dataset.panel === 'leaderboard') { populateSimSelectors(); }
-      if (item.dataset.panel === 'news') { populateSimSelectors(); loadNews(); loadScheduledNews(); loadNewsStocks(selectedSimId || parseInt($('#news-sim-select')?.value)); }
+      if (item.dataset.panel === 'news') { populateSimSelectors(); loadNews(); loadScheduledNews(); loadNewsStocks(selectedSimId); }
       if (item.dataset.panel === 'simulations') loadSimulations();
       if (item.dataset.panel === 'archive') loadArchive();
     });
@@ -73,6 +73,7 @@
       allSimulations = await res.json();
       renderSimList();
       updateActiveSimPanel();
+      populateSimSelectors();
     } catch (err) {
       showToast('FAILED TO LOAD SIMULATIONS', 'error');
     }
@@ -376,6 +377,11 @@
 
   // ─── Simulation Selectors ─────────────────────────────────
   function populateSimSelectors() {
+    if (!selectedSimId && allSimulations.length > 0) {
+      const runningSim = allSimulations.find(s => s.status === 'running');
+      selectedSimId = runningSim ? runningSim.id : allSimulations[0].id;
+    }
+
     const options = allSimulations.map(s =>
       `<option value="${s.id}" ${s.id === selectedSimId ? 'selected' : ''}>${escapeHtml(s.name)} [${s.status.toUpperCase()}]</option>`
     ).join('');
@@ -402,7 +408,7 @@
 
   // Load stocks for news impact controls
   async function loadNewsStocks(simId) {
-    if (!simId) { newsStocks = []; renderStockImpactControls(); return; }
+    if (!simId) { newsStocks = []; renderStockImpactControls(); validateNewsForm(); return; }
     try {
       const res = await fetch(`/api/admin/simulations/${simId}/stocks`);
       newsStocks = await res.json();
@@ -411,6 +417,7 @@
       newsStocks = [];
       renderStockImpactControls();
     }
+    validateNewsForm();
   }
 
   // ═══ STOCK MANAGEMENT ═════════════════════════════════════
@@ -442,9 +449,9 @@
       const volBars = s.volatility === 'low' ? 1 : s.volatility === 'medium' ? 2 : 3;
       return `
         <tr>
-          <td class="ticker" style="color: ${stockColor}; text-shadow: 0 0 8px ${stockColor}40;">${s.ticker}</td>
-          <td style="color: var(--text-primary)">${s.name}</td>
-          <td><span class="industry-tag">${s.industry}</span></td>
+          <td class="ticker" style="color: ${stockColor}; text-shadow: 0 0 8px ${stockColor}40;">${escapeHtml(s.ticker)}</td>
+          <td style="color: var(--text-primary)">${escapeHtml(s.name)}</td>
+          <td><span class="industry-tag">${escapeHtml(s.industry)}</span></td>
           <td class="price">₹${s.starting_price.toFixed(2)}</td>
           <td class="price" style="color: ${isPositive ? 'var(--price-up)' : 'var(--price-down)'}">
             ₹${s.current_price.toFixed(2)} (${isPositive ? '+' : ''}${change}%)
@@ -523,6 +530,14 @@
   let currentAnalysis = null;
   let newsStocks = []; // stocks for the selected simulation
 
+  function validateNewsForm() {
+    // No-op: validation handled dynamically on click for a more robust UX (never greyed out)
+    publishBtn.disabled = false;
+    scheduleBtn.disabled = false;
+  }
+
+  headlineInput.addEventListener('input', validateNewsForm);
+
   // ─── Render impact controls when news sim changes ──────────
   function renderStockImpactControls() {
     if (newsStocks.length === 0) {
@@ -554,7 +569,7 @@
     suggestCheckboxes.innerHTML = newsStocks.map(s => `
       <label style="display:inline-flex; align-items:center; gap:0.3rem; padding:0.25rem 0.6rem; background:rgba(0,212,255,0.06); border:1px solid rgba(0,212,255,0.15); border-radius:4px; cursor:pointer; font-size:0.7rem; font-family:'Source Code Pro',monospace; color:var(--text-primary); transition:all 0.15s;">
         <input type="checkbox" class="suggest-stock-cb" value="${s.id}" style="accent-color:#8A5CFF;">
-        <span style="color:var(--blue-bright);font-weight:600;">${s.ticker}</span> ${s.name}
+        <span style="color:var(--blue-bright);font-weight:600;">${escapeHtml(s.ticker)}</span> ${escapeHtml(s.name)}
       </label>
     `).join('');
   }
@@ -592,7 +607,7 @@
                style="padding:0.5rem 0.75rem; margin-bottom:0.35rem; background:rgba(138,92,255,0.03); border:1px solid rgba(138,92,255,0.1); border-radius:4px; cursor:pointer; font-size:0.72rem; color:var(--text-primary); font-family:'Source Code Pro',monospace; transition:all 0.15s;"
                onmouseover="this.style.borderColor='rgba(138,92,255,0.4)'"
                onmouseout="if(this.style.background!=='rgba(138, 92, 255, 0.1)')this.style.borderColor='rgba(138,92,255,0.1)'">
-            <span style="color:#8A5CFF;font-weight:700;margin-right:0.3rem;">${i + 1}.</span> ${h}
+            <span style="color:#8A5CFF;font-weight:700;margin-right:0.3rem;">${i + 1}.</span> ${escapeHtml(h)}
           </div>
         `).join('');
       } else {
@@ -675,6 +690,7 @@
     $('#schedule-options').style.display = 'none';
     publishBtn.style.display = 'inline-flex';
     scheduleBtn.style.display = 'none';
+    validateNewsForm();
   });
 
   $('#mode-schedule').addEventListener('click', () => {
@@ -684,6 +700,7 @@
     $('#schedule-options').style.display = 'block';
     publishBtn.style.display = 'none';
     scheduleBtn.style.display = 'inline-flex';
+    validateNewsForm();
   });
 
   const scheduleDay = $('#schedule-day');
@@ -718,8 +735,29 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ headline, intendedStrength })
       });
-      const data = await res.json();
+      
+      let data;
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      data = await res.json();
+      if (!data || !data.impacts) {
+        throw new Error('Invalid analysis response structure');
+      }
+
       currentAnalysis = data;
+
+      // Handle fallback badge status
+      const fallbackBadge = $('#ai-fallback-badge');
+      if (fallbackBadge) {
+        if (data.isFallback) {
+          fallbackBadge.style.display = 'inline-block';
+          showToast('⚠️ AI QUOTA LIMIT ACTIVE: KEYWORD FALLBACK STRENGTHENED', 'info');
+        } else {
+          fallbackBadge.style.display = 'none';
+        }
+      }
 
       const tagsHtml = data.impacts.map(i => {
         const arrow = i.sentiment === 'positive' ? '↑' : i.sentiment === 'negative' ? '↓' : '→';
@@ -768,7 +806,35 @@
 
       scheduleBtn.disabled = false;
     } catch (err) {
-      showToast('ANALYSIS FAILED', 'error');
+      console.error('AI Analysis failed, activating manual mode:', err);
+      showToast('⚠️ AI ANALYSIS LIMIT REACHED — MANUAL EDIT ACTIVE', 'warning');
+      
+      const fallbackBadge = $('#ai-fallback-badge');
+      if (fallbackBadge) {
+        fallbackBadge.style.display = 'inline-block';
+      }
+
+      currentAnalysis = {
+        impacts: [],
+        summary: 'Manual Headline Impact',
+        smartInvestorAction: 'Enter news details and select stock impacts manually.',
+        isFallback: true
+      };
+
+      $('#impact-tags').innerHTML = '<span style="color:#ff9f1c;">⚠️ MANUAL MODE ACTIVE: ENTER IMPACTS BELOW</span>';
+      $('#impact-summary').textContent = 'Please configure manual stock impacts in the editor below.';
+      $('#impact-reasoning').innerHTML = `
+        <div class="reasoning-block" style="border-color: rgba(255, 159, 28, 0.3);">
+          > MANUAL OVERRIDE ACTIVE:\nGemini API quota exceeded or network unavailable. The manual editor below is fully active and ready. You can specify which stocks are impacted and by how much, then schedule or publish this news directly.
+        </div>
+      `;
+
+      impactPreview.classList.add('visible');
+
+      // Keep whatever is in stockImpactList or add one default empty row if empty
+      if (stockImpactList.children.length === 0) addImpactRow();
+
+      scheduleBtn.disabled = false;
     }
 
     analyzeBtn.disabled = false;
@@ -786,7 +852,7 @@
   // ─── Publish Now ───────────────────────────────────────────
   publishBtn.addEventListener('click', async () => {
     const simId = selectedSimId || parseInt($('#news-sim-select')?.value);
-    if (!simId) return;
+    if (!simId) { showToast('SELECT A SIMULATION', 'error'); return; }
 
     const headline = headlineInput.value.trim();
     if (!headline) { showToast('ENTER A HEADLINE', 'error'); return; }
@@ -823,10 +889,10 @@
   // ─── Schedule ──────────────────────────────────────────────
   scheduleBtn.addEventListener('click', async () => {
     const simId = selectedSimId || parseInt($('#news-sim-select')?.value);
-    if (!simId) return;
+    if (!simId) { showToast('SELECT A SIMULATION', 'error'); return; }
 
     const headline = headlineInput.value.trim();
-    if (!headline || !currentAnalysis) return;
+    if (!headline) { showToast('ENTER A HEADLINE', 'error'); return; }
 
     const day = parseInt(scheduleDay.value) || 1;
     const pct = parseInt(scheduleTime.value) || 0;
@@ -842,9 +908,9 @@
         body: JSON.stringify({
           headline,
           impacts: buildFinalImpacts(),
-          summary: currentAnalysis?.summary || '',
-          reasoning: currentAnalysis?.impacts?.map(i => i.reasoning).join('\n\n') || '',
-          smartInvestorAction: currentAnalysis?.smartInvestorAction || '',
+          summary: currentAnalysis?.summary || `Scheduled News: ${headline.substring(0, 60)}`,
+          reasoning: currentAnalysis?.impacts?.map(i => i.reasoning).join('\n\n') || 'Scheduled manually without AI analysis.',
+          smartInvestorAction: currentAnalysis?.smartInvestorAction || 'Review manual stock impacts in details list.',
           scheduledDay
         })
       });
@@ -864,7 +930,7 @@
     headlineInput.value = '';
     impactPreview.classList.remove('visible');
     currentAnalysis = null;
-    scheduleBtn.disabled = true;
+    validateNewsForm();
     suggestionsOutput.style.display = 'none';
     suggestionsList.innerHTML = '';
     renderStockImpactControls();

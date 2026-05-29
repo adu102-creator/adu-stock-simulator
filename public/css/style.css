@@ -25,10 +25,10 @@
   --blue-glow-strong: rgba(0, 170, 255, 0.35);
 
   /* Semantic */
-  --price-up: #00e5ff;
-  --price-down: #0044ff;
-  --green-buy: #00e5ff;
-  --red-sell: #0044ff;
+  --price-up: #00ffb3;
+  --price-down: #ff4d6d;
+  --green-buy: #00ffb3;
+  --red-sell: #ff4d6d;
 
   /* Text */
   --text-primary: #00aaff;
@@ -1386,13 +1386,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .stock-card-change.positive {
-  background: rgba(0, 229, 255, 0.08);
-  color: var(--blue-bright);
+  background: rgba(0, 255, 179, 0.08);
+  color: var(--price-up);
 }
 
 .stock-card-change.negative {
-  background: rgba(0, 68, 255, 0.08);
-  color: var(--blue-deep);
+  background: rgba(255, 77, 109, 0.08);
+  color: var(--price-down);
 }
 
 /* ─── Portfolio Performance Chart ──────────────────────────── */
@@ -2055,3 +2055,18 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .company-info-wrapper {
   margin-bottom: 1.25rem;
 }
+
+/* ─── Text Alignment Utilities ─── */
+.text-left { text-align: left !important; }
+.text-center { text-align: center !important; }
+.text-right { text-align: right !important; }
+
+/* ─── Table Header Legibility Upgrades ─── */
+body.holo-environment .stocks-table th,
+body.holo-environment .leaderboard-table th {
+  font-size: 0.72rem;
+  color: rgba(0, 212, 255, 0.75) !important;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+}
+
