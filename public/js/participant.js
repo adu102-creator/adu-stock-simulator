@@ -26,6 +26,7 @@
 
   const socket = io();
   let simState = null;
+  let countdownInterval = null;
   let stockData = {};
   let portfolio = { cash: 0, holdings: [], trades: [] };
   let selectedStock = null;
@@ -110,7 +111,44 @@
     const statusIndicator = $('#sim-status-indicator');
     const statusBanner = $('#sim-status-banner');
 
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+
     if (!state || state.status === 'not_started') {
+      const scheduledTime = state?.scheduled_start_time ? new Date(state.scheduled_start_time) : null;
+      const now = new Date();
+      if (scheduledTime && scheduledTime > now) {
+        const updateCountdown = () => {
+          const t = scheduledTime - new Date();
+          if (t <= 0) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+            showStatusBanner('// SIMULATION IS PREPARING TO START... Awaiting launch from server.', 'idle');
+            return;
+          }
+          const hours = Math.floor(t / (1000 * 60 * 60));
+          const mins = Math.floor((t % (1000 * 60 * 60)) / (1000 * 60));
+          const secs = Math.floor((t % (1000 * 60)) / 1000);
+          const hh = hours.toString().padStart(2, '0');
+          const mm = mins.toString().padStart(2, '0');
+          const ss = secs.toString().padStart(2, '0');
+          
+          showStatusBanner(`⏰ COUNTDOWN — Simulation starts automatically in: ${hh}:${mm}:${ss} (Standby for Sunday Night)`, 'paused');
+          statusIndicator.innerHTML = `<span class="status-badge paused">[ STARTING IN: ${hh}:${mm}:${ss} ]</span>`;
+        };
+        
+        updateCountdown();
+        countdownInterval = setInterval(updateCountdown, 1000);
+        
+        $('#sim-name').textContent = state.name || '—';
+        $('#current-day').textContent = 'STANDBY';
+        $('#day-progress-fill').style.width = '0%';
+        setTradingEnabled(false);
+        return;
+      }
+
       showStatusBanner('// NO ACTIVE SIMULATION — browse freely, trading disabled until admin starts a simulation.', 'idle');
       statusIndicator.innerHTML = '<span class="status-badge not-started">[ STANDBY ]</span>';
       $('#sim-name').textContent = '—';

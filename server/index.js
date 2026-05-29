@@ -327,6 +327,38 @@ app.post('/api/admin/simulation/:id/start', requireAdmin, async (req, res) => {
   res.json(result);
 });
 
+app.post('/api/admin/simulation/:id/schedule', requireAdmin, async (req, res) => {
+  try {
+    const simId = parseInt(req.params.id);
+    const { startTime } = req.body; // ISO String or null to cancel
+
+    const sim = await stmts.getSimulation(simId);
+    if (!sim) return res.status(404).json({ error: 'Simulation not found' });
+    if (sim.status !== 'not_started') {
+      return res.status(400).json({ error: 'Can only schedule simulations that have not started' });
+    }
+
+    let parsedTime = null;
+    if (startTime) {
+      parsedTime = new Date(startTime);
+      if (isNaN(parsedTime.getTime()) || parsedTime < new Date()) {
+        return res.status(400).json({ error: 'Scheduled start time must be a valid date in the future' });
+      }
+    }
+
+    await stmts.scheduleSimulation(parsedTime, simId);
+
+    // Re-broadcast state so all participants get the countdown standby state
+    const state = await simulation.getState();
+    io.emit('sim:state', state || { status: 'not_started' });
+
+    res.json({ success: true, message: startTime ? `Simulation scheduled successfully` : 'Scheduled start cancelled' });
+  } catch (error) {
+    console.error('Schedule simulation error:', error);
+    res.status(500).json({ error: 'Failed to schedule simulation' });
+  }
+});
+
 app.post('/api/admin/simulation/:id/pause', requireAdmin, async (req, res) => {
   const result = await simulation.pause(parseInt(req.params.id));
   res.json(result);

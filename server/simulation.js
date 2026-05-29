@@ -14,13 +14,31 @@ class SimulationEngine {
     this.newsCheckInterval = null;
     this.activeSimId = null; // Currently active simulation ID
     this.activeImpacts = [];  // Persistent news impact queue
+
+    // Check for scheduled starts every 5 seconds
+    setInterval(() => {
+      this._checkScheduledStarts();
+    }, 5000);
   }
 
   /**
    * Get the current simulation state from the database.
    */
   async getState(simId) {
-    const id = simId || this.activeSimId;
+    let id = simId || this.activeSimId;
+
+    if (!id) {
+      try {
+        const sims = await stmts.getAllSimulations();
+        const scheduledSim = sims.find(s => s.status === 'not_started' && s.scheduled_start_time);
+        if (scheduledSim) {
+          id = scheduledSim.id;
+        }
+      } catch (e) {
+        console.error('Error finding scheduled simulation in getState:', e);
+      }
+    }
+
     if (!id) return null;
 
     const sim = await stmts.getSimulation(id);
@@ -521,6 +539,37 @@ class SimulationEngine {
         console.log(`🔄 Recovering running simulation "${activeSim.name}"...`);
         this._startEngines();
       }
+    }
+  }
+
+  /**
+   * Check for any scheduled simulations that should be started.
+   */
+  async _checkScheduledStarts() {
+    try {
+      const sims = await stmts.getAllSimulations();
+      const now = new Date();
+      for (const sim of sims) {
+        if (sim.status === 'not_started' && sim.scheduled_start_time) {
+          const scheduled = new Date(sim.scheduled_start_time);
+          if (scheduled <= now) {
+            console.log(`⏰ Scheduled start time reached for simulation "${sim.name}"! Starting automatically...`);
+            // Clear scheduled start time first to prevent double start
+            await stmts.scheduleSimulation(null, sim.id);
+            const result = await this.start(sim.id);
+            if (result && result.error) {
+              console.error(`❌ Failed to automatically start scheduled simulation: ${result.error}`);
+            } else {
+              // Broadcast state change to all clients
+              const state = await this.getState(sim.id);
+              this.io.emit('sim:state', state);
+              console.log(`🚀 Scheduled simulation "${sim.name}" started successfully!`);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error in _checkScheduledStarts:', e);
     }
   }
 }

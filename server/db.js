@@ -139,6 +139,13 @@ async function initDB() {
     );
   `);
 
+  // Migration: Add scheduled_start_time to simulations table
+  try {
+    await pool.query(`ALTER TABLE simulations ADD COLUMN IF NOT EXISTS scheduled_start_time TIMESTAMP DEFAULT NULL`);
+  } catch (e) {
+    console.error('Migration error adding scheduled_start_time:', e);
+  }
+
   console.log('  ✅ PostgreSQL schema initialized');
 }
 
@@ -180,8 +187,8 @@ const stmts = {
 
   // Simulations
   createSimulation: async (p) => execute(
-    "INSERT INTO simulations (name, total_days, starting_cash, status) VALUES ($1,$2,$3,'not_started') RETURNING id",
-    [p.name, p.total_days, p.starting_cash]
+    "INSERT INTO simulations (name, total_days, starting_cash, status, scheduled_start_time) VALUES ($1,$2,$3,'not_started',$4) RETURNING id",
+    [p.name, p.total_days, p.starting_cash, p.scheduled_start_time || null]
   ),
   getSimulation: (id) => queryOne('SELECT * FROM simulations WHERE id = $1', [id]),
   getAllSimulations: () => queryAll('SELECT * FROM simulations ORDER BY created_at DESC'),
@@ -199,11 +206,14 @@ const stmts = {
     await pool.query('DELETE FROM simulations WHERE id = $1', [simId]);
   },
   updateSimulation: (p) => execute(
-    'UPDATE simulations SET status=$1, current_day=$2, day_start_time=$3, elapsed_in_day=$4, started_at=$5, paused_at=$6, stopped_at=$7 WHERE id=$8',
-    [p.status, p.current_day, p.day_start_time, p.elapsed_in_day, p.started_at, p.paused_at, p.stopped_at, p.id]
+    'UPDATE simulations SET status=$1, current_day=$2, day_start_time=$3, elapsed_in_day=$4, started_at=$5, paused_at=$6, stopped_at=$7, scheduled_start_time=$8 WHERE id=$9',
+    [p.status, p.current_day, p.day_start_time, p.elapsed_in_day, p.started_at, p.paused_at, p.stopped_at, p.scheduled_start_time || null, p.id]
   ),
   updateSimStatus: (status, stopped_at, id) => execute(
     'UPDATE simulations SET status = $1, stopped_at = $2 WHERE id = $3', [status, stopped_at, id]
+  ),
+  scheduleSimulation: (time, id) => execute(
+    'UPDATE simulations SET scheduled_start_time = $1 WHERE id = $2', [time, id]
   ),
   releaseReport: (released_at, id) => execute(
     'UPDATE simulations SET report_released = 1, report_released_at = $1 WHERE id = $2', [released_at, id]

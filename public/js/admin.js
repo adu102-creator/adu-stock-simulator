@@ -29,6 +29,14 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
+  const formatDateTimeLocal = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   // ─── Toast ─────────────────────────────────────────────────
   function showToast(message, type = 'info') {
     const container = $('#toast-container');
@@ -149,6 +157,26 @@
     $('#btn-pause-sim').style.display = isRunning ? 'inline-flex' : 'none';
     $('#btn-resume-sim').style.display = isPaused ? 'inline-flex' : 'none';
     $('#btn-stop-sim').style.display = (isRunning || isPaused) ? 'inline-flex' : 'none';
+
+    // Update schedule container
+    const scheduleContainer = $('#schedule-sim-container');
+    if (scheduleContainer) {
+      scheduleContainer.style.display = isNotStarted ? 'inline-flex' : 'none';
+      if (isNotStarted) {
+        const timeInput = $('#schedule-sim-time');
+        const cancelBtn = $('#btn-cancel-schedule-sim');
+        const setBtn = $('#btn-schedule-sim');
+        if (sim.scheduled_start_time) {
+          timeInput.value = formatDateTimeLocal(sim.scheduled_start_time);
+          cancelBtn.style.display = 'inline-flex';
+          setBtn.textContent = '[ UPDATE ]';
+        } else {
+          timeInput.value = '';
+          cancelBtn.style.display = 'none';
+          setBtn.textContent = '[ SET ]';
+        }
+      }
+    }
   }
 
   function updateSimUI(state) {
@@ -187,12 +215,33 @@
       const badgeClass = simState.status === 'stopped' ? 'archived' : simState.status.replace('_', '-');
       $('#active-sim-status-badge').innerHTML = `<span class="status-badge ${badgeClass}"><span class="status-dot"></span>${statusText[simState.status]}</span>`;
       
+      const isNotStarted = simState.status === 'not_started';
       const isRunning = simState.status === 'running';
       const isPaused = simState.status === 'paused';
-      $('#btn-start-sim').style.display = simState.status === 'not_started' ? 'inline-flex' : 'none';
+      $('#btn-start-sim').style.display = isNotStarted ? 'inline-flex' : 'none';
       $('#btn-pause-sim').style.display = isRunning ? 'inline-flex' : 'none';
       $('#btn-resume-sim').style.display = isPaused ? 'inline-flex' : 'none';
       $('#btn-stop-sim').style.display = (isRunning || isPaused) ? 'inline-flex' : 'none';
+
+      // Update schedule container
+      const scheduleContainer = $('#schedule-sim-container');
+      if (scheduleContainer) {
+        scheduleContainer.style.display = isNotStarted ? 'inline-flex' : 'none';
+        if (isNotStarted) {
+          const timeInput = $('#schedule-sim-time');
+          const cancelBtn = $('#btn-cancel-schedule-sim');
+          const setBtn = $('#btn-schedule-sim');
+          if (simState.scheduled_start_time) {
+            timeInput.value = formatDateTimeLocal(simState.scheduled_start_time);
+            cancelBtn.style.display = 'inline-flex';
+            setBtn.textContent = '[ UPDATE ]';
+          } else {
+            timeInput.value = '';
+            cancelBtn.style.display = 'none';
+            setBtn.textContent = '[ SET ]';
+          }
+        }
+      }
     }
 
     if (simState.id && !$('#active-sim-panel').style.display !== 'none') {
@@ -373,6 +422,56 @@
     const data = await res.json();
     if (data.success) { showToast('[ STOPPED & ARCHIVED ]', 'info'); selectedSimId = null; loadSimulations(); }
     else showToast(data.error, 'error');
+  });
+
+  // Scheduling controls
+  $('#btn-schedule-sim').addEventListener('click', async () => {
+    if (!selectedSimId) return;
+    const timeVal = $('#schedule-sim-time').value;
+    if (!timeVal) {
+      showToast('SELECT A START DATE & TIME', 'warning');
+      return;
+    }
+    const startTime = new Date(timeVal).toISOString();
+
+    try {
+      const res = await fetch(`/api/admin/simulation/${selectedSimId}/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startTime })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('SIMULATION SCHEDULED SUCCESSFULLY', 'success');
+        loadSimulations();
+      } else {
+        showToast(data.error, 'error');
+      }
+    } catch {
+      showToast('CONNECTION ERROR', 'error');
+    }
+  });
+
+  $('#btn-cancel-schedule-sim').addEventListener('click', async () => {
+    if (!selectedSimId) return;
+    if (!confirm('Cancel the scheduled start for this simulation?')) return;
+
+    try {
+      const res = await fetch(`/api/admin/simulation/${selectedSimId}/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startTime: null })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('SCHEDULED START CANCELLED', 'info');
+        loadSimulations();
+      } else {
+        showToast(data.error, 'error');
+      }
+    } catch {
+      showToast('CONNECTION ERROR', 'error');
+    }
   });
 
   // ─── Simulation Selectors ─────────────────────────────────
