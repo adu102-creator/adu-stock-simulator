@@ -930,13 +930,21 @@ app.get('/register', (req, res) => {
 // ─── Start Server ──────────────────────────────────────────────
 async function startServer() {
   // ─── Enforce required environment variables ────────────────
-  const required = ['DATABASE_URL', 'SESSION_SECRET', 'ADMIN_USERNAME', 'ADMIN_PASSWORD'];
+  const required = ['DATABASE_URL'];
   const missing = required.filter(k => !process.env[k]);
   if (missing.length > 0) {
     console.error(`\n❌ FATAL: Missing required environment variables: ${missing.join(', ')}`);
     console.error('   Set these in your .env file or Render environment settings.\n');
     process.exit(1);
   }
+
+  // Log warnings for recommended variables
+  const recommended = ['SESSION_SECRET', 'ADMIN_USERNAME', 'ADMIN_PASSWORD'];
+  recommended.forEach(k => {
+    if (!process.env[k]) {
+      console.warn(`⚠️  Warning: Recommended environment variable "${k}" is not set.`);
+    }
+  });
 
   // Initialize database tables
   await initDB();
