@@ -620,3 +620,11 @@ body.holo-environment .status-badge.not-started {
   border-radius: 0px !important;
   font-family: 'Source Code Pro', monospace !important;
 }
+
+/* ═══ MAIN TRADING INTERFACE LAYOUT ═══ */
+#trading-interface {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+  width: 100% !important;
+}
