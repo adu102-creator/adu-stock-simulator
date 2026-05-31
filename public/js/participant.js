@@ -104,8 +104,121 @@
   });
 
   // ─── Access Code Join Simulation ─────────────────────────
+  let selectedLobbySimId = null;
+  let selectedLobbySimName = '';
+  let lobbyListTimerInterval = null;
+
   const btnJoinSim = $('#btn-join-sim');
+  const btnCancelJoin = $('#btn-cancel-join');
   const inputJoinAccessCode = $('#join-access-code');
+
+  // Cancel joining overlay and restore the lobby list
+  if (btnCancelJoin) {
+    btnCancelJoin.addEventListener('click', () => {
+      selectedLobbySimId = null;
+      selectedLobbySimName = '';
+      inputJoinAccessCode.value = '';
+      $('#join-code-panel').style.display = 'none';
+      $('#sim-list-container').style.display = 'block';
+      loadLobbySimulations();
+    });
+  }
+
+  window.selectLobbySimulation = function(simId, name) {
+    selectedLobbySimId = simId;
+    selectedLobbySimName = name;
+    
+    // Clear code input
+    inputJoinAccessCode.value = '';
+    
+    // Hide list and show access panel
+    $('#sim-list-container').style.display = 'none';
+    $('#join-code-panel').style.display = 'block';
+    $('#join-lobby-description').textContent = `// ENTER ACCESS CODE TO JOIN "${name.toUpperCase()}" //`;
+    
+    // Focus the input
+    inputJoinAccessCode.focus();
+  };
+
+  async function loadLobbySimulations() {
+    if (lobbyListTimerInterval) {
+      clearInterval(lobbyListTimerInterval);
+      lobbyListTimerInterval = null;
+    }
+
+    const listElement = $('#lobby-sims-list');
+    if (!listElement) return;
+
+    try {
+      const res = await fetch('/api/participant/available-simulations');
+      const sims = await res.json();
+
+      if (!Array.isArray(sims) || sims.length === 0) {
+        listElement.innerHTML = '<div class="empty-state"><p>// NO ACTIVE OR UPCOMING SIMULATIONS AT THIS TIME //</p></div>';
+        return;
+      }
+
+      listElement.innerHTML = sims.map(sim => {
+        const hasStart = !!sim.scheduled_start_time;
+        const timeLabel = hasStart ? formatCountdownLabel(sim.scheduled_start_time) : '--:--:--';
+        const startSecs = hasStart ? Math.ceil((new Date(sim.scheduled_start_time) - new Date()) / 1000) : null;
+        
+        return `
+          <div class="glass-card lobby-sim-card" style="padding: 1rem; border-color: rgba(0, 170, 255, 0.15); border-radius: 0; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3);" id="lobby-card-${sim.id}">
+            <div>
+              <h5 style="font-family: 'Source Code Pro', monospace; color: #fff; font-size: 0.82rem; margin: 0 0 0.25rem 0;">[ ${escapeHtml(sim.name)} ]</h5>
+              <span style="font-size: 0.65rem; color: var(--text-muted); font-family: 'Source Code Pro', monospace;">₹${Number(sim.starting_cash).toLocaleString('en-IN')} starting cash // ${sim.total_days} days</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 1.5rem;">
+              <div style="text-align: right;">
+                <div style="font-size: 0.6rem; color: var(--text-muted); font-family: 'Source Code Pro', monospace; text-transform: uppercase;">START IN</div>
+                <div class="lobby-sim-timer" data-sim-id="${sim.id}" data-time-left="${startSecs !== null ? startSecs : ''}" style="font-family: 'Source Code Pro', monospace; font-size: 1rem; color: var(--blue-bright); text-shadow: 0 0 10px rgba(0, 170, 255, 0.25);">${timeLabel}</div>
+              </div>
+              <button class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.35rem 0.8rem; border-radius: 0;" onclick="selectLobbySimulation(${sim.id}, '${escapeHtml(sim.name)}')">[ JOIN ]</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Run live update interval for all individual countdown timers
+      const timerElements = document.querySelectorAll('.lobby-sim-timer');
+      lobbyListTimerInterval = setInterval(() => {
+        timerElements.forEach(el => {
+          const timeLeftAttr = el.getAttribute('data-time-left');
+          if (timeLeftAttr !== '' && timeLeftAttr !== null) {
+            let secondsLeft = parseInt(timeLeftAttr);
+            secondsLeft = Math.max(0, secondsLeft - 1);
+            el.setAttribute('data-time-left', secondsLeft);
+            
+            if (secondsLeft <= 0) {
+              el.textContent = 'STARTING...';
+            } else {
+              const hrs = Math.floor(secondsLeft / 3600);
+              const mins = Math.floor((secondsLeft % 3600) / 60);
+              const secs = secondsLeft % 60;
+              el.textContent = `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+          }
+        });
+      }, 1000);
+
+    } catch (e) {
+      console.error('Error loading available sims:', e);
+      listElement.innerHTML = '<div class="empty-state"><p>// ERROR LOADING SIMULATIONS //</p></div>';
+    }
+  }
+
+  function formatCountdownLabel(scheduledTimeStr) {
+    const scheduledTime = new Date(scheduledTimeStr);
+    const now = new Date();
+    const t = scheduledTime - now;
+    if (t <= 0) return 'STARTING...';
+    
+    const hours = Math.floor(t / (1000 * 60 * 60));
+    const mins = Math.floor((t % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((t % (1000 * 60)) / 1000);
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
 
   if (btnJoinSim && inputJoinAccessCode) {
     const handleJoin = async () => {
@@ -132,7 +245,14 @@
         if (res.ok && data.success) {
           showToast('// ACCESS GRANTED // Auto-enrolled in simulation!', 'success');
           inputJoinAccessCode.value = '';
+          selectedLobbySimId = null;
+          selectedLobbySimName = '';
           
+          if (lobbyListTimerInterval) {
+            clearInterval(lobbyListTimerInterval);
+            lobbyListTimerInterval = null;
+          }
+
           // Re-fetch simulation state and refresh UI immediately
           const simRes = await fetch('/api/participant/simulation');
           const simData = await simRes.json();
@@ -171,7 +291,7 @@
         showToast('// ERROR: Connection failed.', 'error');
       } finally {
         btnJoinSim.disabled = false;
-        btnJoinSim.textContent = '[ JOIN LOBBY ]';
+        btnJoinSim.textContent = '[ ENTER LOBBY ]';
       }
     };
 
@@ -193,29 +313,21 @@
       countdownInterval = null;
     }
 
-    // Determine if we need to show the join code panel
-    if (!state || !state.id) {
-      // Case 1: No simulation active at all
+    // Case 1 & Case 2: No active simulation OR exists but user has not joined yet
+    if (!state || !state.id || !state.isParticipant) {
       $('#waiting-screen').style.display = 'flex';
       $('#trading-interface').style.display = 'none';
-      $('#join-code-panel').style.display = 'none';
       $('#lobby-countdown-container').style.display = 'none';
-      $('#waiting-icon').style.display = 'block';
-      $('#waiting-title').textContent = 'AWAITING SIMULATION';
-      $('#waiting-message').textContent = '// Standby for administrator to initialize a simulation lobby...';
-      return;
-    }
-
-    if (!state.isParticipant) {
-      // Case 2: A simulation exists, but user has not joined yet.
-      // In this case, we MUST restrict access and show the Access Code Join Form.
-      $('#waiting-screen').style.display = 'flex';
-      $('#trading-interface').style.display = 'none';
-      $('#join-code-panel').style.display = 'block';
-      $('#lobby-countdown-container').style.display = 'none';
-      $('#waiting-icon').style.display = 'block';
-      $('#waiting-title').textContent = 'SIMULATION DETECTED';
-      $('#waiting-message').textContent = `// ACTIVE LOBBY: ${state.name} //`;
+      
+      // If they are currently in the process of entering code, keep the join panel open
+      if (selectedLobbySimId !== null) {
+        $('#sim-list-container').style.display = 'none';
+        $('#join-code-panel').style.display = 'block';
+      } else {
+        $('#sim-list-container').style.display = 'block';
+        $('#join-code-panel').style.display = 'none';
+        loadLobbySimulations();
+      }
       return;
     }
 
@@ -223,6 +335,7 @@
     if (state.status === 'not_started') {
       $('#waiting-screen').style.display = 'flex';
       $('#trading-interface').style.display = 'none';
+      $('#sim-list-container').style.display = 'none';
       $('#join-code-panel').style.display = 'none';
       $('#lobby-countdown-container').style.display = 'block';
       

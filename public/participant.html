@@ -15,26 +15,43 @@
 
     <!-- Waiting Screen -->
     <div class="waiting-screen" id="waiting-screen" style="display: none;">
-      <div class="icon" id="waiting-icon">[STANDBY]</div>
-      <h2 id="waiting-title">AWAITING SIMULATION</h2>
-      <p id="waiting-message" style="margin-bottom: 1.5rem;">// the simulation has not started. please wait for admin initialization.</p>
+      
+      <!-- List of Active/Upcoming Simulations -->
+      <div id="sim-list-container" style="display: none; max-width: 600px; width: 100%; margin: 0 auto 2rem auto; text-align: left;">
+        <div class="icon" style="text-align: center; font-size: 2.5rem; margin-bottom: 1.25rem; color: var(--blue-primary); font-family: 'Source Code Pro', monospace;">[STANDBY]</div>
+        <h2 style="font-family: 'Source Code Pro', monospace; color: var(--blue-bright); letter-spacing: 0.1em; text-align: center; margin-bottom: 0.5rem; text-transform: uppercase;">AWAITING SIMULATION</h2>
+        <p style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-bottom: 2rem; font-family: 'Source Code Pro', monospace;">// Select an active simulation lobby to request access.</p>
+        
+        <div class="glass-card" style="padding: 1.5rem; border-color: var(--blue-border); border-radius: 0;">
+          <h4 style="font-family: 'Source Code Pro', monospace; color: var(--blue-bright); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1rem; border-bottom: 1px solid rgba(0, 170, 255, 0.15); padding-bottom: 0.5rem;">// ACTIVE & UPCOMING LOBBIES</h4>
+          <div id="lobby-sims-list" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div class="empty-state"><p>// loading simulations...</p></div>
+          </div>
+        </div>
+      </div>
 
       <!-- Big Countdown Clock / Standby Lobby Container -->
       <div id="lobby-countdown-container" style="display: none; margin: 2rem auto; text-align: center;">
+        <div class="icon" id="waiting-icon" style="font-size: 2.5rem; margin-bottom: 1.25rem; color: var(--blue-primary); font-family: 'Source Code Pro', monospace;">[STANDBY]</div>
+        <h2 id="waiting-title">LOBBY JOINED</h2>
+        <p id="waiting-message" style="margin-bottom: 1.5rem;">// Ready for simulation //</p>
         <div id="lobby-countdown-clock" style="font-family: 'Source Code Pro', monospace; font-size: 5rem; font-weight: bold; color: var(--blue-bright); text-shadow: 0 0 25px rgba(0, 170, 255, 0.4); letter-spacing: 0.1em; margin-bottom: 1rem; line-height: 1;">00:00:00</div>
         <div id="lobby-countdown-label" style="font-family: 'Source Code Pro', monospace; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.15em;">// WAITING IN LOBBY //</div>
       </div>
 
       <!-- Sleek Glowing Access Code Panel -->
-      <div id="join-code-panel" class="glass-card" style="display: none; max-width: 400px; width: 100%; margin: 2rem auto; padding: 2rem; border-color: var(--blue-bright); box-shadow: 0 0 20px rgba(0, 170, 255, 0.2); text-align: center; border-radius: 0;">
-        <h3 style="font-family: 'Source Code Pro', monospace; color: var(--blue-bright); letter-spacing: 0.1em; margin-bottom: 0.5rem; text-transform: uppercase;">ENTER ACCESS CODE</h3>
-        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1.5rem; font-family: 'Source Code Pro', monospace;">// Enter the 4-digit code provided by the administrator to join the trade lobby.</p>
+      <div id="join-code-panel" class="glass-card" style="display: none; max-width: 420px; width: 100%; margin: 2rem auto; padding: 2.5rem; border-color: var(--blue-bright); box-shadow: 0 0 30px rgba(0, 170, 255, 0.25); text-align: center; border-radius: 0;">
+        <h3 style="font-family: 'Source Code Pro', monospace; color: var(--blue-bright); letter-spacing: 0.05em; font-size: 1.15rem; margin-bottom: 0.5rem; text-transform: uppercase; text-shadow: var(--text-glow-bright);">YOU WERE CHOSEN. NOW PROVE IT.</h3>
+        <p style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 1.75rem; font-family: 'Source Code Pro', monospace;" id="join-lobby-description">// ENTER ACCESS CODE TO JOIN //</p>
         
-        <div class="form-group" style="margin-bottom: 1.5rem;">
-          <input type="text" id="join-access-code" maxlength="4" placeholder="[ CODE ]" style="font-family: 'Source Code Pro', monospace; font-size: 2rem; text-align: center; text-transform: uppercase; letter-spacing: 0.2em; color: #fff; background: rgba(0,0,0,0.4); border: 2px solid var(--blue-bright); width: 100%; padding: 0.75rem; border-radius: 0; box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.15);">
+        <div class="form-group" style="margin-bottom: 1.75rem;">
+          <input type="text" id="join-access-code" maxlength="4" placeholder="[ CODE ]" style="font-family: 'Source Code Pro', monospace; font-size: 2.2rem; text-align: center; text-transform: uppercase; letter-spacing: 0.2em; color: #fff; background: rgba(0,0,0,0.5); border: 2px solid var(--blue-bright); width: 100%; padding: 0.85rem; border-radius: 0; box-shadow: inset 0 0 15px rgba(0, 170, 255, 0.25);">
         </div>
         
-        <button class="btn btn-primary btn-lg" id="btn-join-sim" style="width: 100%; font-size: 1rem; border-radius: 0; padding: 0.75rem;">[ JOIN LOBBY ]</button>
+        <div style="display: flex; gap: 1rem;">
+          <button class="btn btn-ghost" id="btn-cancel-join" style="flex: 1; border-radius: 0; font-size: 0.8rem; border-color: rgba(0, 170, 255, 0.2);">[ CANCEL ]</button>
+          <button class="btn btn-primary" id="btn-join-sim" style="flex: 2; border-radius: 0; font-size: 0.8rem; padding: 0.75rem;">[ ENTER LOBBY ]</button>
+        </div>
       </div>
     </div>
 

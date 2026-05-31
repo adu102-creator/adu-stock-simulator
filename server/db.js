@@ -272,8 +272,13 @@ const stmts = {
   ),
   getRegistrableSimulations: (userId) => queryAll(
     `SELECT s.*, 
-      (SELECT sr.status FROM simulation_registrations sr WHERE sr.simulation_id = s.id AND sr.user_id = $1) as reg_status
-     FROM simulations s WHERE s.status = 'not_started' ORDER BY s.created_at DESC`,
+      (SELECT sp.user_id FROM simulation_participants sp WHERE sp.simulation_id = s.id AND sp.user_id = $1) as joined_user_id
+     FROM simulations s 
+     WHERE s.status = 'not_started' 
+     ORDER BY 
+       CASE WHEN s.scheduled_start_time IS NULL THEN 1 ELSE 0 END, 
+       s.scheduled_start_time ASC, 
+       s.created_at DESC`,
     [userId]
   ),
 
