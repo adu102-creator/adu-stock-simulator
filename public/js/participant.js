@@ -196,16 +196,13 @@
     // Determine if we need to show the join code panel
     if (!state || !state.id) {
       // Case 1: No simulation active at all
-      // We show the dashboard and let them browse archives freely, but disable trading
-      $('#waiting-screen').style.display = 'none';
-      showTrading();
-      
-      showStatusBanner('// NO ACTIVE SIMULATION — browse freely, trading disabled until admin starts a simulation.', 'idle');
-      statusIndicator.innerHTML = '<span class="status-badge not-started">[ STANDBY ]</span>';
-      $('#sim-name').textContent = '—';
-      $('#current-day').textContent = '—';
-      $('#day-progress-fill').style.width = '0%';
-      setTradingEnabled(false);
+      $('#waiting-screen').style.display = 'flex';
+      $('#trading-interface').style.display = 'none';
+      $('#join-code-panel').style.display = 'none';
+      $('#lobby-countdown-container').style.display = 'none';
+      $('#waiting-icon').style.display = 'block';
+      $('#waiting-title').textContent = 'AWAITING SIMULATION';
+      $('#waiting-message').textContent = '// Standby for administrator to initialize a simulation lobby...';
       return;
     }
 
@@ -215,6 +212,8 @@
       $('#waiting-screen').style.display = 'flex';
       $('#trading-interface').style.display = 'none';
       $('#join-code-panel').style.display = 'block';
+      $('#lobby-countdown-container').style.display = 'none';
+      $('#waiting-icon').style.display = 'block';
       $('#waiting-title').textContent = 'SIMULATION DETECTED';
       $('#waiting-message').textContent = `// ACTIVE LOBBY: ${state.name} //`;
       return;
@@ -222,25 +221,27 @@
 
     // Case 3: Joined participant but simulation is not started yet (Lobby stage)
     if (state.status === 'not_started') {
-      // Let them browse the dashboard freely but disable trading, show thin banner at the top!
-      $('#waiting-screen').style.display = 'none';
-      showTrading();
-
-      $('#sim-name').textContent = state.name || '—';
-      $('#current-day').textContent = 'STANDBY';
-      $('#day-progress-fill').style.width = '0%';
-      statusIndicator.innerHTML = '<span class="status-badge not-started">[ STANDBY ]</span>';
-      setTradingEnabled(false);
+      $('#waiting-screen').style.display = 'flex';
+      $('#trading-interface').style.display = 'none';
+      $('#join-code-panel').style.display = 'none';
+      $('#lobby-countdown-container').style.display = 'block';
+      
+      $('#waiting-title').textContent = 'LOBBY JOINED';
+      $('#waiting-message').textContent = `// Ready for simulation: ${state.name} //`;
 
       const scheduledTime = state.scheduled_start_time ? new Date(state.scheduled_start_time) : null;
       const now = new Date();
       if (scheduledTime && scheduledTime > now) {
+        // We have an active countdown! Show the big clock.
+        $('#waiting-icon').style.display = 'none'; // focus on the clock
+        
         const updateCountdown = () => {
           const t = scheduledTime - new Date();
           if (t <= 0) {
             clearInterval(countdownInterval);
             countdownInterval = null;
-            showStatusBanner('// SIMULATION IS PREPARING TO START... Awaiting launch from server.', 'idle');
+            $('#lobby-countdown-clock').textContent = 'LAUNCHING...';
+            $('#lobby-countdown-label').textContent = '// THE MARKET IS INITIALIZING //';
             return;
           }
           const hours = Math.floor(t / (1000 * 60 * 60));
@@ -250,13 +251,17 @@
           const mm = mins.toString().padStart(2, '0');
           const ss = secs.toString().padStart(2, '0');
           
-          showStatusBanner(`⏰ COUNTDOWN — Simulation starts automatically in: ${hh}:${mm}:${ss}`, 'paused');
+          $('#lobby-countdown-clock').textContent = `${hh}:${mm}:${ss}`;
+          $('#lobby-countdown-label').textContent = '// COUNTDOWN TO LAUNCH //';
         };
         
         updateCountdown();
         countdownInterval = setInterval(updateCountdown, 1000);
       } else {
-        showStatusBanner(`// SUCCESS: Registered for "${state.name}". Waiting for the admin to start the market. //`, 'idle');
+        // No scheduled start time yet. Show retro standby status.
+        $('#waiting-icon').style.display = 'block';
+        $('#lobby-countdown-clock').textContent = 'STANDBY';
+        $('#lobby-countdown-label').textContent = '// WAITING FOR HOST TO START THE MARKET //';
       }
       return;
     }
