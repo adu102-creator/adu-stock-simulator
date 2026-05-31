@@ -6,7 +6,7 @@
 (async function () {
   'use strict';
 
-  const STOCK_COLORS = ['#00e5ff','#1565c0','#40c4ff','#0091ea','#80d8ff','#00b0ff','#448aff'];
+  const STOCK_COLORS = ['#00e5ff', '#00ff66', '#bd00ff', '#ff0055', '#ff9f1c', '#ffd700', '#00ffcc'];
 
   // ─── Auth Check ────────────────────────────────────────────
   let currentUser = null;
@@ -412,10 +412,10 @@
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#010b13',
-              titleColor: '#00aaff',
-              bodyColor: '#00e5ff',
-              borderColor: '#003a5c',
+              backgroundColor: '#02050d',
+              titleColor: '#00e5ff',
+              bodyColor: '#e0f7fc',
+              borderColor: 'rgba(0, 229, 255, 0.25)',
               borderWidth: 1,
               titleFont: { family: "'Source Code Pro', monospace", size: 11 },
               bodyFont: { family: "'Source Code Pro', monospace", size: 12 },
@@ -430,20 +430,20 @@
             x: {
               display: true,
               ticks: {
-                color: '#1a4f6e',
+                color: '#5d7285',
                 font: { family: "'Source Code Pro', monospace", size: 9 },
                 maxTicksLimit: 10,
               },
-              grid: { color: 'rgba(0, 58, 92, 0.15)', drawBorder: false },
+              grid: { color: 'rgba(0, 229, 255, 0.08)', drawBorder: false },
             },
             y: {
               display: true,
               ticks: {
-                color: '#1a4f6e',
+                color: '#5d7285',
                 font: { family: "'Source Code Pro', monospace", size: 9 },
                 callback: (v) => `₹${v.toFixed(0)}`,
               },
-              grid: { color: 'rgba(0, 58, 92, 0.15)', drawBorder: false },
+              grid: { color: 'rgba(0, 229, 255, 0.08)', drawBorder: false },
             }
           },
           animation: { duration: 300 },
@@ -678,8 +678,8 @@
     // Determine if profit or loss for color
     const latestVal = values[values.length - 1];
     const isProfit = latestVal >= startingCash;
-    const lineColor = isProfit ? '#00e676' : '#ff5252';
-    const fillColor = isProfit ? 'rgba(0,230,118,0.08)' : 'rgba(255,82,82,0.08)';
+    const lineColor = isProfit ? '#00ff66' : '#ff4d6d';
+    const fillColor = isProfit ? 'rgba(0, 255, 102, 0.08)' : 'rgba(255, 77, 109, 0.08)';
 
     if (portfolioChart) {
       portfolioChart.data.labels = labels;
@@ -725,10 +725,10 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#010b13',
-            titleColor: '#00aaff',
-            bodyColor: '#00e5ff',
-            borderColor: '#003a5c',
+            backgroundColor: '#02050d',
+            titleColor: '#00e5ff',
+            bodyColor: '#e0f7fc',
+            borderColor: 'rgba(0, 229, 255, 0.25)',
             borderWidth: 1,
             titleFont: { family: "'Source Code Pro', monospace", size: 11 },
             bodyFont: { family: "'Source Code Pro', monospace", size: 11 },
@@ -742,19 +742,19 @@
             title: {
               display: true,
               text: chartViewMode === 'day' ? 'TIME IN DAY (%)' : 'SIMULATION DAY',
-              color: 'rgba(0, 212, 255, 0.3)',
+              color: 'rgba(0, 229, 255, 0.3)',
               font: { family: "'Source Code Pro', monospace", size: 9 }
             },
-            ticks: { color: '#1a4f6e', font: { family: "'Source Code Pro', monospace", size: 9 }, maxTicksLimit: 10 },
-            grid: { color: 'rgba(0, 58, 92, 0.15)' }
+            ticks: { color: '#5d7285', font: { family: "'Source Code Pro', monospace", size: 9 }, maxTicksLimit: 10 },
+            grid: { color: 'rgba(0, 229, 255, 0.08)' }
           },
           y: {
             ticks: {
-              color: '#1a4f6e',
+              color: '#5d7285',
               font: { family: "'Source Code Pro', monospace", size: 9 },
               callback: (v) => '₹' + (v / 1000).toFixed(0) + 'K'
             },
-            grid: { color: 'rgba(0, 58, 92, 0.15)' }
+            grid: { color: 'rgba(0, 229, 255, 0.08)' }
           }
         },
         interaction: { intersect: false, mode: 'index' }

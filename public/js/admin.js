@@ -6,7 +6,7 @@
 (async function () {
   'use strict';
 
-  const STOCK_COLORS = ['#00e5ff','#1565c0','#40c4ff','#0091ea','#80d8ff','#00b0ff','#448aff'];
+  const STOCK_COLORS = ['#00e5ff', '#00ff66', '#bd00ff', '#ff0055', '#ff9f1c', '#ffd700', '#00ffcc'];
 
   // ─── Auth Check ────────────────────────────────────────────
   let currentUser = null;
