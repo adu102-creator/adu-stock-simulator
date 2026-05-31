@@ -8,3 +8,6 @@ data/
 .DS_Store
 cookies.txt
 pcookies.txt
+/test-*.js
+/query-*.js
+/inspect-*.js

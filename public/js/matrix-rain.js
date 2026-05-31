@@ -10,7 +10,8 @@
   const CHARS =
     'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン' +
     'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ' +
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' +
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
+    '0123456789012345678901234567890123456789' +
     '∑∏∫√∂∇≈≠≤≥±×÷¢£¥€$₹@#%&';
 
   const isAuthPage = !!document.querySelector('.auth-page');

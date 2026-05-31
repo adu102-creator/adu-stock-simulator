@@ -246,9 +246,7 @@
   // Only init on dashboard pages (not auth)
   if (!document.querySelector('.auth-page')) {
     initParticles();
-    setupFloatingPanels();
     setupPanelReveals();
-    createScanlineSweep();
     createHoloGrid();
 
     // Add perspective wrapper class to body

@@ -99,6 +99,10 @@
       <div class="tab-content" id="portfolio-tab">
         <h3 class="section-title">PORTFOLIO PERFORMANCE</h3>
         <div class="glass-card portfolio-chart-container" style="margin-bottom: 1.5rem;">
+          <div class="chart-view-toggle" id="chart-view-toggle">
+            <button class="chart-view-btn" id="chart-view-day" title="Current Day">CURRENT DAY</button>
+            <button class="chart-view-btn active" id="chart-view-all" title="All History">ALL HISTORY</button>
+          </div>
           <canvas id="portfolio-perf-chart"></canvas>
         </div>
         <h3 class="section-title">YOUR HOLDINGS</h3>
@@ -254,7 +258,6 @@
 
   <div class="toast-container" id="toast-container"></div>
 
-  <script src="/js/matrix-rain.js"></script>
   <script src="/js/holographic-ui.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/participant.js"></script>

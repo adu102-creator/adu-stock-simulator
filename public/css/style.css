@@ -1338,8 +1338,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .stock-card:hover {
   border-color: var(--blue-primary);
-  transform: translateY(-1px);
-  box-shadow: var(--box-glow-active);
 }
 
 .stock-card-header {
@@ -1398,8 +1396,47 @@ input[type="range"]::-webkit-slider-thumb:hover {
 /* ─── Portfolio Performance Chart ──────────────────────────── */
 .portfolio-chart-container {
   position: relative;
-  height: 220px;
+  height: 280px;
   padding: 0.75rem;
+}
+
+/* ─── Chart View Toggle ───────────────────────────────────── */
+.chart-view-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0.75rem;
+  background: rgba(0, 30, 60, 0.4);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  overflow: hidden;
+  width: fit-content;
+}
+.chart-view-btn {
+  padding: 0.35rem 0.85rem;
+  font-family: 'Source Code Pro', monospace;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  background: transparent;
+  border: none;
+  color: rgba(0, 212, 255, 0.35);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  text-transform: uppercase;
+}
+.chart-view-btn:hover {
+  color: rgba(0, 212, 255, 0.6);
+  background: rgba(0, 212, 255, 0.04);
+}
+.chart-view-btn.active {
+  color: #00D4FF;
+  background: rgba(0, 212, 255, 0.12);
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+  box-shadow: inset 0 0 10px rgba(0, 212, 255, 0.08);
+}
+.chart-view-btn + .chart-view-btn {
+  border-left: 1px solid rgba(0, 212, 255, 0.1);
 }
 
 .stock-card-desc {

@@ -35,6 +35,7 @@
   let lastRank = null; // Track leaderboard position for change popups
   let portfolioHistory = []; // {time, value} snapshots for chart
   let portfolioChart = null;
+  let chartViewMode = 'all'; // 'all' or 'day'
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -620,14 +621,58 @@
 
   // ═══ PORTFOLIO PERFORMANCE CHART ═══════════════════════════
 
+  // ─── Chart View Toggle ─────────────────────────────────────
+  const chartViewDayBtn = document.getElementById('chart-view-day');
+  const chartViewAllBtn = document.getElementById('chart-view-all');
+
+  if (chartViewDayBtn && chartViewAllBtn) {
+    chartViewDayBtn.addEventListener('click', () => {
+      chartViewMode = 'day';
+      chartViewDayBtn.classList.add('active');
+      chartViewAllBtn.classList.remove('active');
+      forceChartRedraw();
+    });
+    chartViewAllBtn.addEventListener('click', () => {
+      chartViewMode = 'all';
+      chartViewAllBtn.classList.add('active');
+      chartViewDayBtn.classList.remove('active');
+      forceChartRedraw();
+    });
+  }
+
+  function forceChartRedraw() {
+    // Destroy existing chart and recreate with new data range
+    if (portfolioChart) {
+      portfolioChart.destroy();
+      portfolioChart = null;
+    }
+    updatePortfolioChart();
+  }
+
+  function getFilteredPortfolioData() {
+    if (chartViewMode === 'day' && simState) {
+      const currentDay = Math.floor(simState.simDay || simState.current_day || 1);
+      return portfolioHistory.filter(p => Math.floor(p.time) === currentDay);
+    }
+    return portfolioHistory;
+  }
+
   function updatePortfolioChart() {
-    if (portfolioHistory.length < 2) return;
+    const filteredData = getFilteredPortfolioData();
+    if (filteredData.length < 2) return;
 
     const ctx = document.getElementById('portfolio-perf-chart');
     if (!ctx) return;
 
-    const labels = portfolioHistory.map(p => `D${parseFloat(p.time).toFixed(1)}`);
-    const values = portfolioHistory.map(p => p.value);
+    const labels = filteredData.map(p => {
+      if (chartViewMode === 'day') {
+        // Show time-within-day as percentage
+        const dayFraction = (p.time % 1) * 100;
+        return `${dayFraction.toFixed(0)}%`;
+      }
+      return `D${parseFloat(p.time).toFixed(1)}`;
+    });
+    const values = filteredData.map(p => p.value);
     const startingCash = simState ? (simState.starting_cash || values[0]) : values[0];
 
     // Determine if profit or loss for color
@@ -694,6 +739,12 @@
         },
         scales: {
           x: {
+            title: {
+              display: true,
+              text: chartViewMode === 'day' ? 'TIME IN DAY (%)' : 'SIMULATION DAY',
+              color: 'rgba(0, 212, 255, 0.3)',
+              font: { family: "'Source Code Pro', monospace", size: 9 }
+            },
             ticks: { color: '#1a4f6e', font: { family: "'Source Code Pro', monospace", size: 9 }, maxTicksLimit: 10 },
             grid: { color: 'rgba(0, 58, 92, 0.15)' }
           },
