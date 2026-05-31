@@ -10,14 +10,13 @@
   const CHARS =
     'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン' +
     'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ' +
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
-    '012345678901234567890123456789012345678901234567890123456789' +
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' +
     '∑∏∫√∂∇≈≠≤≥±×÷¢£¥€$₹@#%&';
 
   const isAuthPage = !!document.querySelector('.auth-page');
 
   // ─── Config ────────────────────────────────────────────────
-  const FONT_SIZE     = isAuthPage ? 22 : 16;
+  const FONT_SIZE     = isAuthPage ? 15 : 13;
   const OPACITY       = isAuthPage ? 1.0 : 0.3;
   const FADE_SPEED    = isAuthPage ? 0.04 : 0.07;
   const FLICKER_RATE  = 0.03;
@@ -115,8 +114,8 @@
         ctx.fillText(randChar(), x, fy);
       }
 
-      // ── Advance drop (slowed down for smooth, soothing aesthetics) ──
-      drops[i] += 0.2 + Math.random() * 0.3;
+      // ── Advance drop ──
+      drops[i] += 0.4 + Math.random() * 0.5;
 
       // ── Reset when off screen ──
       if (row > maxRow) {
