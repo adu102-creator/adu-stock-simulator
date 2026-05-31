@@ -8,6 +8,17 @@
 
   const STOCK_COLORS = ['#00e5ff', '#00ff66', '#bd00ff', '#ff0055', '#ff9f1c', '#ffd700', '#00ffcc'];
 
+  function safeParseUTC(dateStr) {
+    if (!dateStr) return null;
+    let s = dateStr.toString().trim();
+    if (!s.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(s)) {
+      s += 'Z';
+    }
+    s = s.replace(' ', 'T');
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   // ─── Auth Check ────────────────────────────────────────────
   let currentUser = null;
   try {
@@ -31,8 +42,8 @@
 
   const formatDateTimeLocal = (dateStr) => {
     if (!dateStr) return '';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
+    const d = safeParseUTC(dateStr);
+    if (!d) return '';
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
@@ -1283,7 +1294,7 @@
       <div class="sim-card">
         <div class="sim-card-info">
           <h4>${escapeHtml(s.name)}</h4>
-          <span>${s.total_days} days // stopped ${s.stopped_at ? new Date(s.stopped_at).toLocaleDateString() : '—'} ${s.report_released ? '// REPORT RELEASED' : ''}</span>
+          <span>${s.total_days} days // stopped ${s.stopped_at ? safeParseUTC(s.stopped_at).toLocaleDateString() : '—'} ${s.report_released ? '// REPORT RELEASED' : ''}</span>
         </div>
         <div class="sim-card-actions">
           <span class="status-badge archived"><span class="status-dot"></span>[ ARCHIVED ]</span>

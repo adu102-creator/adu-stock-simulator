@@ -359,10 +359,11 @@ app.post('/api/admin/simulation/:id/schedule', requireAdmin, async (req, res) =>
 
     let parsedTime = null;
     if (startTime) {
-      parsedTime = new Date(startTime);
-      if (isNaN(parsedTime.getTime()) || parsedTime < new Date()) {
+      const parsedDate = new Date(startTime);
+      if (isNaN(parsedDate.getTime()) || parsedDate < new Date()) {
         return res.status(400).json({ error: 'Scheduled start time must be a valid date in the future' });
       }
+      parsedTime = parsedDate.toISOString();
     }
 
     await stmts.scheduleSimulation(parsedTime, simId);

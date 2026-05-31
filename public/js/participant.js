@@ -8,6 +8,17 @@
 
   const STOCK_COLORS = ['#00e5ff', '#00ff66', '#bd00ff', '#ff0055', '#ff9f1c', '#ffd700', '#00ffcc'];
 
+  function safeParseUTC(dateStr) {
+    if (!dateStr) return null;
+    let s = dateStr.toString().trim();
+    if (!s.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(s)) {
+      s += 'Z';
+    }
+    s = s.replace(' ', 'T');
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   // ─── Auth Check ────────────────────────────────────────────
   let currentUser = null;
   try {
@@ -77,6 +88,14 @@
     window.location.href = '/';
   });
 
+  const btnLogoutStandby = $('#btn-logout-standby');
+  if (btnLogoutStandby) {
+    btnLogoutStandby.addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/';
+    });
+  }
+
   // ─── Tab Navigation ───────────────────────────────────────
   $$('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -121,6 +140,18 @@
       $('#join-code-panel').style.display = 'none';
       $('#sim-list-container').style.display = 'block';
       loadLobbySimulations();
+    });
+  }
+
+  const lobbySimsList = $('#lobby-sims-list');
+  if (lobbySimsList) {
+    lobbySimsList.addEventListener('click', (e) => {
+      const joinBtn = e.target.closest('.btn-join-lobby');
+      if (joinBtn) {
+        const simId = parseInt(joinBtn.getAttribute('data-sim-id'));
+        const name = joinBtn.getAttribute('data-sim-name');
+        selectLobbySimulation(simId, name);
+      }
     });
   }
 
@@ -211,9 +242,10 @@
       }
 
       listElement.innerHTML = sims.map(sim => {
-        const hasStart = !!sim.scheduled_start_time;
-        const timeLabel = hasStart ? formatCountdownLabel(sim.scheduled_start_time) : '--:--:--';
-        const startSecs = hasStart ? Math.ceil((new Date(sim.scheduled_start_time) - new Date()) / 1000) : null;
+        const schedTime = safeParseUTC(sim.scheduled_start_time);
+        const hasStart = !!schedTime;
+        const timeLabel = hasStart ? formatCountdownLabel(schedTime) : '--:--:--';
+        const startSecs = hasStart ? Math.ceil((schedTime - new Date()) / 1000) : null;
         
         return `
           <div class="glass-card lobby-sim-card" style="padding: 1rem; border-color: rgba(0, 170, 255, 0.15); border-radius: 0; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3);" id="lobby-card-${sim.id}">
@@ -226,7 +258,7 @@
                 <div style="font-size: 0.6rem; color: var(--text-muted); font-family: 'Source Code Pro', monospace; text-transform: uppercase;">START IN</div>
                 <div class="lobby-sim-timer" data-sim-id="${sim.id}" data-time-left="${startSecs !== null ? startSecs : ''}" style="font-family: 'Source Code Pro', monospace; font-size: 1rem; color: var(--blue-bright); text-shadow: 0 0 10px rgba(0, 170, 255, 0.25);">${timeLabel}</div>
               </div>
-              <button class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.35rem 0.8rem; border-radius: 0;" onclick="selectLobbySimulation(${sim.id}, '${escapeHtml(sim.name)}')">[ JOIN ]</button>
+              <button class="btn btn-primary btn-sm btn-join-lobby" data-sim-id="${sim.id}" data-sim-name="${escapeHtml(sim.name)}" style="font-size: 0.75rem; padding: 0.35rem 0.8rem; border-radius: 0;">[ JOIN ]</button>
             </div>
           </div>
         `;
@@ -239,6 +271,7 @@
           const timeLeftAttr = el.getAttribute('data-time-left');
           if (timeLeftAttr !== '' && timeLeftAttr !== null) {
             let secondsLeft = parseInt(timeLeftAttr);
+            if (isNaN(secondsLeft)) return;
             secondsLeft = Math.max(0, secondsLeft - 1);
             el.setAttribute('data-time-left', secondsLeft);
             
@@ -260,8 +293,13 @@
     }
   }
 
-  function formatCountdownLabel(scheduledTimeStr) {
-    const scheduledTime = new Date(scheduledTimeStr);
+  function formatCountdownLabel(scheduledTime) {
+    if (!scheduledTime) return '--:--:--';
+    if (!(scheduledTime instanceof Date) || isNaN(scheduledTime.getTime())) {
+      scheduledTime = safeParseUTC(scheduledTime);
+    }
+    if (!scheduledTime) return '--:--:--';
+
     const now = new Date();
     const t = scheduledTime - now;
     if (t <= 0) return 'STARTING...';
@@ -394,7 +432,7 @@
       $('#waiting-title').textContent = 'LOBBY JOINED';
       $('#waiting-message').textContent = `// Ready for simulation: ${state.name} //`;
 
-      const scheduledTime = state.scheduled_start_time ? new Date(state.scheduled_start_time) : null;
+      const scheduledTime = safeParseUTC(state.scheduled_start_time);
       const now = new Date();
       if (scheduledTime && scheduledTime > now) {
         // We have an active countdown! Show the big clock.
@@ -1182,7 +1220,7 @@
       <div class="sim-card" style="cursor: default;">
         <div class="sim-card-info">
           <h4>${escapeHtml(s.name)}</h4>
-          <span>${s.total_days} days // ended ${s.stopped_at ? new Date(s.stopped_at).toLocaleDateString() : '—'}</span>
+          <span>${s.total_days} days // ended ${s.stopped_at ? safeParseUTC(s.stopped_at).toLocaleDateString() : '—'}</span>
         </div>
         <div class="sim-card-actions">
           <span class="status-badge archived"><span class="status-dot"></span>[ ARCHIVED ]</span>
