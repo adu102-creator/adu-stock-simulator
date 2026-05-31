@@ -1692,6 +1692,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 #join-code-panel {
+  display: flex;
   max-width: 950px;
   width: 90%;
   min-height: 45vh;
