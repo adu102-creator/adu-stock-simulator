@@ -124,6 +124,52 @@
     });
   }
 
+  // --- Katakana Scrambler / Text Materializer Effect ---
+  const katakana = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  function matrixMaterializeText(element, targetText, duration = 2000) {
+    const chars = katakana.split('');
+    const targetChars = targetText.split('');
+    let currentText = targetChars.map(() => chars[Math.floor(Math.random() * chars.length)]);
+    
+    const resolved = targetChars.map((c) => c === ' ' || c === '.' || c === ',');
+    const startTime = Date.now();
+    
+    if (element.matrixInterval) {
+      clearInterval(element.matrixInterval);
+    }
+    
+    element.matrixInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = elapsed / duration;
+      
+      for (let i = 0; i < targetChars.length; i++) {
+        if (resolved[i]) continue;
+        
+        if (Math.random() < progress || elapsed >= duration) {
+          resolved[i] = true;
+          currentText[i] = targetChars[i];
+        } else {
+          currentText[i] = chars[Math.floor(Math.random() * chars.length)];
+        }
+      }
+      
+      element.innerHTML = currentText.map((char, index) => {
+        if (resolved[index]) {
+          return `<span style="color: #ffffff; text-shadow: var(--text-glow-bright);">${char}</span>`;
+        } else {
+          return `<span style="color: var(--blue-bright); text-shadow: 0 0 8px var(--blue-bright); font-weight: bold;">${char}</span>`;
+        }
+      }).join('');
+      
+      if (resolved.every(r => r) || elapsed >= duration) {
+        clearInterval(element.matrixInterval);
+        element.matrixInterval = null;
+        element.innerHTML = targetChars.map(char => `<span style="color: #ffffff; text-shadow: var(--text-glow-bright);">${char}</span>`).join('');
+      }
+    }, 45);
+  }
+
   window.selectLobbySimulation = function(simId, name) {
     selectedLobbySimId = simId;
     selectedLobbySimName = name;
@@ -131,10 +177,16 @@
     // Clear code input
     inputJoinAccessCode.value = '';
     
-    // Hide list and show access panel
+    // Hide list and show access panel as flex
     $('#sim-list-container').style.display = 'none';
-    $('#join-code-panel').style.display = 'block';
+    $('#join-code-panel').style.display = 'flex';
     $('#join-lobby-description').textContent = `// ENTER ACCESS CODE TO JOIN "${name.toUpperCase()}" //`;
+    
+    // Trigger matrix scrambler animation!
+    const titleElement = $('#scramble-title');
+    if (titleElement) {
+      matrixMaterializeText(titleElement, 'YOU WERE CHOSEN. NOW PROVE IT.', 2500);
+    }
     
     // Focus the input
     inputJoinAccessCode.focus();
@@ -322,7 +374,7 @@
       // If they are currently in the process of entering code, keep the join panel open
       if (selectedLobbySimId !== null) {
         $('#sim-list-container').style.display = 'none';
-        $('#join-code-panel').style.display = 'block';
+        $('#join-code-panel').style.display = 'flex';
       } else {
         $('#sim-list-container').style.display = 'block';
         $('#join-code-panel').style.display = 'none';
