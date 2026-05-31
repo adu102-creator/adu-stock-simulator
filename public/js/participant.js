@@ -103,30 +103,130 @@
     newsToggle.textContent = newsCollapsed ? 'EXPAND' : 'COLLAPSE';
   });
 
+  // ─── Access Code Join Simulation ─────────────────────────
+  const btnJoinSim = $('#btn-join-sim');
+  const inputJoinAccessCode = $('#join-access-code');
+
+  if (btnJoinSim && inputJoinAccessCode) {
+    const handleJoin = async () => {
+      const accessCode = inputJoinAccessCode.value.trim().toUpperCase();
+      if (!accessCode) {
+        showToast('// ERROR: Please enter an access code.', 'error');
+        return;
+      }
+      if (accessCode.length !== 4) {
+        showToast('// ERROR: Access code must be exactly 4 characters.', 'error');
+        return;
+      }
+
+      btnJoinSim.disabled = true;
+      btnJoinSim.textContent = '[ ENROLLING... ]';
+
+      try {
+        const res = await fetch('/api/participant/simulations/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessCode })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast('// ACCESS GRANTED // Auto-enrolled in simulation!', 'success');
+          inputJoinAccessCode.value = '';
+          
+          // Re-fetch simulation state and refresh UI immediately
+          const simRes = await fetch('/api/participant/simulation');
+          const simData = await simRes.json();
+          updateUI(simData);
+          if (simData.participantCash !== undefined) {
+            portfolio.cash = simData.participantCash;
+          }
+          await loadPortfolio();
+          
+          // Re-fetch stocks & news
+          const stocksRes = await fetch('/api/participant/stocks');
+          const { stocks: stocksList } = await stocksRes.json();
+          if (stocksList) {
+            stocksList.forEach(s => {
+              stockData[s.id] = {
+                id: s.id,
+                ticker: s.ticker,
+                name: s.name,
+                price: s.current_price,
+                startingPrice: s.starting_price,
+                percentChange: ((s.current_price - s.starting_price) / s.starting_price * 100),
+                industry: s.industry,
+                description: s.description || '',
+                colorIndex: s.color_index,
+                volatility: s.volatility || 'medium'
+              };
+            });
+            renderStockGrid(Object.values(stockData));
+          }
+          await loadNews();
+        } else {
+          showToast(data.error || '// ERROR: Access code verification failed.', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('// ERROR: Connection failed.', 'error');
+      } finally {
+        btnJoinSim.disabled = false;
+        btnJoinSim.textContent = '[ JOIN LOBBY ]';
+      }
+    };
+
+    btnJoinSim.addEventListener('click', handleJoin);
+    inputJoinAccessCode.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        handleJoin();
+      }
+    });
+  }
+
   function updateUI(state) {
     simState = state;
 
-    // Always show the trading interface — never block it
-    showTrading();
-
-    const statusIndicator = $('#sim-status-indicator');
-    const statusBanner = $('#sim-status-banner');
-
-    if (countdownInterval) {
-      clearInterval(countdownInterval);
-      countdownInterval = null;
+    // Determine if we need to show the join code panel
+    if (!state || !state.id) {
+      // Case 1: No simulation active at all
+      $('#waiting-screen').style.display = 'flex';
+      $('#trading-interface').style.display = 'none';
+      $('#join-code-panel').style.display = 'none';
+      $('#waiting-title').textContent = 'AWAITING SIMULATION';
+      $('#waiting-message').textContent = '// No simulation is currently active. Standby for administrator launch.';
+      return;
     }
 
-    if (!state || state.status === 'not_started') {
-      const scheduledTime = state?.scheduled_start_time ? new Date(state.scheduled_start_time) : null;
+    if (!state.isParticipant) {
+      // Case 2: A simulation exists, but user has not joined yet
+      $('#waiting-screen').style.display = 'flex';
+      $('#trading-interface').style.display = 'none';
+      $('#join-code-panel').style.display = 'block';
+      $('#waiting-title').textContent = 'SIMULATION DETECTED';
+      $('#waiting-message').textContent = `// ACTIVE LOBBY: ${state.name} //`;
+      return;
+    }
+
+    // Case 3: Joined participant
+    if (state.status === 'not_started') {
+      $('#waiting-screen').style.display = 'flex';
+      $('#trading-interface').style.display = 'none';
+      $('#join-code-panel').style.display = 'none';
+      $('#waiting-title').textContent = 'JOINED LOBBY';
+      
+      const scheduledTime = state.scheduled_start_time ? new Date(state.scheduled_start_time) : null;
       const now = new Date();
       if (scheduledTime && scheduledTime > now) {
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+        }
         const updateCountdown = () => {
           const t = scheduledTime - new Date();
           if (t <= 0) {
             clearInterval(countdownInterval);
             countdownInterval = null;
-            showStatusBanner('// SIMULATION IS PREPARING TO START... Awaiting launch from server.', 'idle');
+            $('#waiting-message').textContent = '// SIMULATION IS PREPARING TO START... Awaiting launch from server.';
             return;
           }
           const hours = Math.floor(t / (1000 * 60 * 60));
@@ -136,27 +236,26 @@
           const mm = mins.toString().padStart(2, '0');
           const ss = secs.toString().padStart(2, '0');
           
-          showStatusBanner(`⏰ COUNTDOWN — Simulation starts automatically in: ${hh}:${mm}:${ss} (Standby for Sunday Night)`, 'paused');
-          statusIndicator.innerHTML = `<span class="status-badge paused">[ STARTING IN: ${hh}:${mm}:${ss} ]</span>`;
+          $('#waiting-message').textContent = `⏰ COUNTDOWN — Simulation starts automatically in: ${hh}:${mm}:${ss}`;
         };
         
         updateCountdown();
         countdownInterval = setInterval(updateCountdown, 1000);
-        
-        $('#sim-name').textContent = state.name || '—';
-        $('#current-day').textContent = 'STANDBY';
-        $('#day-progress-fill').style.width = '0%';
-        setTradingEnabled(false);
-        return;
+      } else {
+        $('#waiting-message').textContent = `// SUCCESS: Registered for "${state.name}". Waiting for the admin to start the market. //`;
       }
-
-      showStatusBanner('// NO ACTIVE SIMULATION — browse freely, trading disabled until admin starts a simulation.', 'idle');
-      statusIndicator.innerHTML = '<span class="status-badge not-started">[ STANDBY ]</span>';
-      $('#sim-name').textContent = '—';
-      $('#current-day').textContent = '—';
-      $('#day-progress-fill').style.width = '0%';
-      setTradingEnabled(false);
       return;
+    }
+
+    // If simulation is running, paused, or stopped, and they are a participant:
+    showTrading();
+
+    const statusIndicator = $('#sim-status-indicator');
+    const statusBanner = $('#sim-status-banner');
+
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
     }
 
     if (state.status === 'paused') {
@@ -171,16 +270,6 @@
     if (state.status === 'stopped') {
       showStatusBanner('// SIMULATION ENDED — check the ARCHIVE tab for results and AI reports.', 'stopped');
       statusIndicator.innerHTML = '<span class="status-badge stopped">[ ENDED ]</span>';
-      $('#sim-name').textContent = state.name || '—';
-      $('#current-day').textContent = `${state.current_day}/${state.total_days}`;
-      setTradingEnabled(false);
-      return;
-    }
-
-    // Spectator state: simulation is running/paused/active but user is not a participant
-    if (state.status === 'running' && !state.isParticipant) {
-      showStatusBanner('// SPECTATING — you are not registered or approved for this active simulation.', 'idle');
-      statusIndicator.innerHTML = '<span class="status-badge paused">[ SPECTATING ]</span>';
       $('#sim-name').textContent = state.name || '—';
       $('#current-day').textContent = `${state.current_day}/${state.total_days}`;
       setTradingEnabled(false);

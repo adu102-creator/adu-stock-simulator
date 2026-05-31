@@ -96,11 +96,10 @@ class SimulationEngine {
     if (sim.status === 'not_started') {
       await stmts.resetSimStockPrices(simId);
 
-      // Only add participants who registered AND were approved for THIS simulation
+      // Under the Access Code Joining System, users can join the lobby before starting or during execution.
+      // So we do not require approved registrations beforehand.
+      // However, if there are already any participants registered/approved, we preserve them.
       const approvedRegs = await stmts.getApprovedSimRegistrations(simId);
-      if (approvedRegs.length === 0) {
-        return { error: 'No approved participants. Approve registrations first.' };
-      }
       for (const reg of approvedRegs) {
         await stmts.addParticipant(simId, reg.user_id, sim.starting_cash);
       }

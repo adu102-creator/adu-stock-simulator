@@ -34,7 +34,8 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW(),
       started_at TIMESTAMP,
       paused_at TIMESTAMP,
-      stopped_at TIMESTAMP
+      stopped_at TIMESTAMP,
+      access_code TEXT UNIQUE
     );
 
     CREATE TABLE IF NOT EXISTS simulation_participants (
@@ -146,6 +147,13 @@ async function initDB() {
     console.error('Migration error adding scheduled_start_time:', e);
   }
 
+  // Migration: Add access_code to simulations table
+  try {
+    await pool.query(`ALTER TABLE simulations ADD COLUMN IF NOT EXISTS access_code TEXT UNIQUE`);
+  } catch (e) {
+    console.error('Migration error adding access_code:', e);
+  }
+
   console.log('  ✅ PostgreSQL schema initialized');
 }
 
@@ -187,10 +195,11 @@ const stmts = {
 
   // Simulations
   createSimulation: async (p) => execute(
-    "INSERT INTO simulations (name, total_days, starting_cash, status, scheduled_start_time) VALUES ($1,$2,$3,'not_started',$4) RETURNING id",
-    [p.name, p.total_days, p.starting_cash, p.scheduled_start_time || null]
+    "INSERT INTO simulations (name, total_days, starting_cash, status, scheduled_start_time, access_code) VALUES ($1,$2,$3,'not_started',$4,$5) RETURNING id",
+    [p.name, p.total_days, p.starting_cash, p.scheduled_start_time || null, p.access_code]
   ),
   getSimulation: (id) => queryOne('SELECT * FROM simulations WHERE id = $1', [id]),
+  getSimulationByAccessCode: (code) => queryOne('SELECT * FROM simulations WHERE access_code = $1', [code]),
   getAllSimulations: () => queryAll('SELECT * FROM simulations ORDER BY created_at DESC'),
   getActiveSimulation: () => queryOne("SELECT * FROM simulations WHERE status IN ('running', 'paused') LIMIT 1"),
   getArchivedSimulations: () => queryAll("SELECT * FROM simulations WHERE status = 'stopped' ORDER BY stopped_at DESC"),

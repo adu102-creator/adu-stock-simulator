@@ -101,6 +101,26 @@ const failedLogins = new Map(); // username -> { count, lockedUntil }
 const MAX_FAILED_LOGINS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+// === Generate Access Code ===
+async function generateAccessCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let isUnique = false;
+  let code = '';
+  let attempts = 0;
+  while (!isUnique && attempts < 100) {
+    attempts++;
+    code = '';
+    for (let i = 0; i < 4; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const existing = await stmts.getSimulationByAccessCode(code);
+    if (!existing) {
+      isUnique = true;
+    }
+  }
+  return code;
+}
+
 // ─── Auth Middleware ────────────────────────────────────────────
 function requireAuth(req, res, next) {
   if (!req.session.userId) {
@@ -282,13 +302,16 @@ app.post('/api/admin/simulations', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Name, totalDays, and startingCash are required' });
     }
 
+    const accessCode = await generateAccessCode();
+
     const result = await stmts.createSimulation({
       name,
       total_days: parseInt(totalDays),
-      starting_cash: parseFloat(startingCash)
+      starting_cash: parseFloat(startingCash),
+      access_code: accessCode
     });
 
-    res.json({ success: true, id: result.lastInsertRowid });
+    res.json({ success: true, id: result.lastInsertRowid, accessCode });
   } catch (error) {
     console.error('Simulation create error:', error);
     res.status(500).json({ error: 'Failed to create simulation' });
@@ -737,6 +760,39 @@ app.post('/api/participant/simulations/:simId/register', requireParticipant, asy
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+app.post('/api/participant/simulations/join', requireParticipant, async (req, res) => {
+  try {
+    const { accessCode } = req.body;
+    if (!accessCode) {
+      return res.status(400).json({ error: 'Access code is required' });
+    }
+
+    const code = accessCode.trim().toUpperCase();
+    if (code.length !== 4) {
+      return res.status(400).json({ error: 'Access code must be exactly 4 characters' });
+    }
+
+    const sim = await stmts.getSimulationByAccessCode(code);
+    if (!sim) {
+      return res.status(404).json({ error: 'Simulation not found. Please check the code and try again.' });
+    }
+
+    if (sim.status === 'stopped') {
+      return res.status(400).json({ error: 'This simulation has already ended.' });
+    }
+
+    const sp = await stmts.getParticipant(sim.id, req.session.userId);
+    if (!sp) {
+      await stmts.addParticipant(sim.id, req.session.userId, sim.starting_cash);
+    }
+
+    res.json({ success: true, simulationId: sim.id });
+  } catch (err) {
+    console.error('Join simulation error:', err);
+    res.status(500).json({ error: 'Failed to join simulation' });
   }
 });
 

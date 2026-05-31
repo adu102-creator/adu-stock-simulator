@@ -147,6 +147,7 @@
     $('#sim-status-text').textContent = statusText[sim.status] || sim.status;
     const badgeClass = sim.status === 'stopped' ? 'archived' : sim.status.replace('_', '-');
     $('#active-sim-status-badge').innerHTML = `<span class="status-badge ${badgeClass}"><span class="status-dot"></span>${statusText[sim.status]}</span>`;
+    $('#sim-access-code-text').textContent = sim.access_code || '—';
 
     const isNotStarted = sim.status === 'not_started';
     const isRunning = sim.status === 'running';
@@ -201,6 +202,10 @@
 
     if (simState.dayProgress !== undefined) {
       $('#day-progress-fill').style.width = `${(simState.dayProgress * 100).toFixed(1)}%`;
+    }
+
+    if (simState.access_code !== undefined) {
+      $('#sim-access-code-text').textContent = simState.access_code || '—';
     }
 
     // Also update status badge

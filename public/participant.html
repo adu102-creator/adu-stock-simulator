@@ -16,8 +16,20 @@
     <!-- Waiting Screen -->
     <div class="waiting-screen" id="waiting-screen" style="display: none;">
       <div class="icon">[STANDBY]</div>
-      <h2>AWAITING SIMULATION</h2>
+      <h2 id="waiting-title">AWAITING SIMULATION</h2>
       <p id="waiting-message">// the simulation has not started. please wait for admin initialization.</p>
+
+      <!-- Sleek Glowing Access Code Panel -->
+      <div id="join-code-panel" class="glass-card" style="display: none; max-width: 400px; width: 100%; margin: 2rem auto; padding: 2rem; border-color: var(--blue-bright); box-shadow: 0 0 20px rgba(0, 170, 255, 0.2); text-align: center; border-radius: 0;">
+        <h3 style="font-family: 'Source Code Pro', monospace; color: var(--blue-bright); letter-spacing: 0.1em; margin-bottom: 0.5rem; text-transform: uppercase;">ENTER ACCESS CODE</h3>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1.5rem; font-family: 'Source Code Pro', monospace;">// Enter the 4-digit code provided by the administrator to join the trade lobby.</p>
+        
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <input type="text" id="join-access-code" maxlength="4" placeholder="[ CODE ]" style="font-family: 'Source Code Pro', monospace; font-size: 2rem; text-align: center; text-transform: uppercase; letter-spacing: 0.2em; color: #fff; background: rgba(0,0,0,0.4); border: 2px solid var(--blue-bright); width: 100%; padding: 0.75rem; border-radius: 0; box-shadow: inset 0 0 10px rgba(0, 170, 255, 0.15);">
+        </div>
+        
+        <button class="btn btn-primary btn-lg" id="btn-join-sim" style="width: 100%; font-size: 1rem; border-radius: 0; padding: 0.75rem;">[ JOIN LOBBY ]</button>
+      </div>
     </div>
 
     <!-- Main Trading Interface -->
