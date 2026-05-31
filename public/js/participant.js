@@ -158,12 +158,28 @@
   // --- Katakana Scrambler / Text Materializer Effect ---
   const katakana = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*+-/<>{}[]_=|?^";
 
-  function matrixMaterializeText(element, targetText, duration = 2000) {
+  function matrixMaterializeText(element, targetText, duration = 3500) {
     const chars = katakana.split('');
     const targetChars = targetText.split('');
     let currentText = targetChars.map(() => chars[Math.floor(Math.random() * chars.length)]);
     
+    // Track whitespace and punctuation to mark them resolved initially
     const resolved = targetChars.map((c) => c === ' ' || c === '.' || c === ',');
+    
+    // Gather all letter indices that need to be decoded
+    const unresolvedIndices = [];
+    for (let i = 0; i < targetChars.length; i++) {
+      if (!resolved[i]) {
+        unresolvedIndices.push(i);
+      }
+    }
+    
+    // Shuffle the unresolved indices so they resolve in a random, natural order
+    for (let i = unresolvedIndices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [unresolvedIndices[i], unresolvedIndices[j]] = [unresolvedIndices[j], unresolvedIndices[i]];
+    }
+    
     const startTime = Date.now();
     
     if (element.matrixInterval) {
@@ -172,16 +188,19 @@
     
     element.matrixInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const progress = elapsed / duration;
+      const progress = Math.min(elapsed / duration, 1);
       
-      for (let i = 0; i < targetChars.length; i++) {
-        if (resolved[i]) continue;
-        
-        if (Math.random() < progress || elapsed >= duration) {
-          resolved[i] = true;
-          currentText[i] = targetChars[i];
+      // Calculate how many indices should be resolved by this frame
+      const numToResolve = Math.floor(progress * unresolvedIndices.length);
+      
+      for (let i = 0; i < unresolvedIndices.length; i++) {
+        const idx = unresolvedIndices[i];
+        if (i < numToResolve || elapsed >= duration) {
+          resolved[idx] = true;
+          currentText[idx] = targetChars[idx];
         } else {
-          currentText[i] = chars[Math.floor(Math.random() * chars.length)];
+          resolved[idx] = false;
+          currentText[idx] = chars[Math.floor(Math.random() * chars.length)];
         }
       }
       
@@ -193,7 +212,7 @@
         }
       }).join('');
       
-      if (resolved.every(r => r) || elapsed >= duration) {
+      if (progress >= 1 || elapsed >= duration) {
         clearInterval(element.matrixInterval);
         element.matrixInterval = null;
         element.innerHTML = targetChars.map(char => `<span style="color: #ffffff; text-shadow: var(--text-glow-bright);">${char}</span>`).join('');
@@ -249,7 +268,7 @@
 
         setTimeout(() => {
           if (titleElement) {
-            matrixMaterializeText(titleElement, 'YOU WERE THE CHOSEN ONE. NOW PROVE IT', 2000);
+            matrixMaterializeText(titleElement, 'YOU WERE THE CHOSEN ONE. NOW PROVE IT', 3500);
           }
         }, 60);
       } catch (animErr) {
