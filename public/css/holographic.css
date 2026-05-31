@@ -7,7 +7,7 @@
   --holo-rose: #ff4d6d;      /* glowing Crimson Rose */
   --holo-violet: #bd00ff;    /* glowing Cyber Violet */
   --holo-white: #e0f7fc;     /* highly readable light white-cyan text */
-  --holo-bg: #02050d;        /* deep space dark background */
+  --holo-bg: #030814;        /* rich technical dark background */
   --holo-panel: rgba(2, 8, 16, 0.9);   /* frosted dark hacker glass card background */
   --holo-border: rgba(0, 229, 255, 0.18); /* thin cyan cyber borders */
   --holo-glow: 0 0 15px rgba(0, 229, 255, 0.08), 0 0 35px rgba(0, 229, 255, 0.03);
@@ -18,7 +18,7 @@
 /* ─── Environment ─── */
 body.holo-environment {
   font-family: 'Source Code Pro', 'Courier New', monospace;
-  background: linear-gradient(160deg, #00030a 0%, #02050d 50%, #000206 100%) !important;
+  background: linear-gradient(160deg, #030814 0%, #0a1836 50%, #050d21 100%) !important;
   color: var(--holo-white) !important;
 }
 
