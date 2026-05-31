@@ -388,29 +388,37 @@ body.holo-environment .news-feed {
   border: 1px solid var(--holo-border) !important;
   border-radius: var(--holo-radius) !important;
   backdrop-filter: blur(12px) !important;
+  max-height: 300px !important; /* Make it bigger/taller to display more stories */
+  padding: 1rem 1.5rem !important; /* Increase spacing */
 }
 
 body.holo-environment .news-item {
   border-bottom-color: rgba(0, 229, 255, 0.08) !important;
   transition: all var(--holo-transition) !important;
+  padding: 0.8rem 0 0.8rem 0.75rem !important; /* Boost padding for breathing room */
 }
 
 body.holo-environment .news-item:hover {
   background: rgba(0, 229, 255, 0.04) !important;
 }
 
-body.holo-environment .news-item .news-title {
+body.holo-environment .news-content h4 {
   font-family: 'Source Code Pro', monospace !important;
-  font-size: 0.95rem !important;
+  font-size: 1.2rem !important; /* 1.5x of normal style size (0.78rem * 1.5 ~ 1.2rem) */
   color: var(--holo-white) !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.15) !important;
+  margin-bottom: 0px !important;
 }
 
-body.holo-environment .news-item .news-desc {
+body.holo-environment .news-day-badge {
   font-family: 'Source Code Pro', monospace !important;
-  font-size: 0.84rem !important;
-  color: #5d7285 !important;
-  margin-top: 0.25rem;
+  font-size: 0.82rem !important; /* Boost day badge text size for visual balance */
+  padding: 0.2rem 0.6rem !important;
+  background: rgba(0, 229, 255, 0.1) !important;
+  border-color: rgba(0, 229, 255, 0.3) !important;
+  color: var(--holo-cyan) !important;
+  border-radius: 0px !important;
 }
 
 body.holo-environment .news-tag.positive,
