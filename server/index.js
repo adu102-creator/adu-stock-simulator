@@ -7,7 +7,7 @@ const session = require('express-session');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
-const { stmts, initDB, createUser, verifyPassword, executeTrade, getLeaderboard, syncAdminCredentials } = require('./db');
+const { stmts, initDB, createUser, verifyPassword, executeTrade, getLeaderboard, syncAdminCredentials, pool } = require('./db');
 const SimulationEngine = require('./simulation');
 const { analyzeHeadline, generateNewsSuggestions, logAIStatus } = require('./ai');
 
@@ -708,15 +708,43 @@ app.get('/api/admin/simulations/:simId/report', requireAdmin, async (req, res) =
 // ─── Participant Routes ────────────────────────────────────────
 
 app.get('/api/participant/simulation', requireParticipant, async (req, res) => {
-  const state = await simulation.getState();
-  if (!state) return res.json({ status: 'not_started' });
-
-  const sp = await stmts.getParticipant(state.id, req.session.userId);
-  res.json({
-    ...state,
-    participantCash: sp ? sp.cash : 0,
-    isParticipant: !!sp
-  });
+  try {
+    // 1. Check if the participant is registered in a running, paused, or not_started simulation
+    const userSimQuery = await pool.query(
+      `SELECT s.* FROM simulations s
+       JOIN simulation_participants sp ON s.id = sp.simulation_id
+       WHERE sp.user_id = $1 AND s.status != 'stopped'
+       LIMIT 1`,
+      [req.session.userId]
+    );
+    
+    let sim = userSimQuery.rows[0];
+    
+    // 2. If they have not joined any simulation yet, try to find the globally active or nearest scheduled simulation
+    if (!sim) {
+      const state = await simulation.getState();
+      if (!state) return res.json({ status: 'not_started' });
+      
+      const sp = await stmts.getParticipant(state.id, req.session.userId);
+      return res.json({
+        ...state,
+        participantCash: sp ? sp.cash : 0,
+        isParticipant: !!sp
+      });
+    }
+    
+    // 3. If they have joined a simulation, get its complete state!
+    const state = await simulation.getState(sim.id);
+    const sp = await stmts.getParticipant(sim.id, req.session.userId);
+    res.json({
+      ...state,
+      participantCash: sp ? sp.cash : 0,
+      isParticipant: true
+    });
+  } catch (error) {
+    console.error('Participant simulation load error:', error);
+    res.status(500).json({ error: 'Failed to load participant simulation data' });
+  }
 });
 
 app.get('/api/participant/portfolio', requireParticipant, async (req, res) => {

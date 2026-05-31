@@ -17,7 +17,7 @@
     <div class="waiting-screen" id="waiting-screen" style="display: none;">
       
       <!-- List of Active/Upcoming Simulations -->
-      <div id="sim-list-container" style="display: none; max-width: 600px; width: 100%; margin: 0 auto 2rem auto; text-align: left;">
+      <div id="sim-list-container" style="display: none; max-width: 600px; width: 100%; margin: 0 auto; text-align: left;">
         <div class="icon" style="text-align: center; font-size: 2.5rem; margin-bottom: 1.25rem; color: var(--blue-primary); font-family: 'Source Code Pro', monospace;">[STANDBY]</div>
         <h2 style="font-family: 'Source Code Pro', monospace; color: var(--blue-bright); letter-spacing: 0.1em; text-align: center; margin-bottom: 0.5rem; text-transform: uppercase;">AWAITING SIMULATION</h2>
         <p style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-bottom: 2rem; font-family: 'Source Code Pro', monospace;">// Select an active simulation lobby to request access.</p>
@@ -45,8 +45,8 @@
       </div>
 
       <!-- Sleek Glowing Access Code Panel -->
-      <div id="join-code-panel" class="glass-card" style="display: none; max-width: 950px; width: 90%; min-height: 60vh; margin: 3rem auto; padding: 4.5rem 3rem; border-color: var(--blue-bright); box-shadow: 0 0 45px rgba(0, 170, 255, 0.35); text-align: center; border-radius: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(2, 6, 12, 0.85) !important;">
-        <h3 style="font-family: 'Source Code Pro', monospace; color: var(--blue-bright); letter-spacing: 0.1em; font-size: 2.2rem !important; margin: 0 0 1rem 0; text-transform: uppercase; text-shadow: var(--text-glow-bright); font-weight: 700; line-height: 1.2;" id="scramble-title">YOU WERE CHOSEN. NOW PROVE IT.</h3>
+      <div id="join-code-panel" class="glass-card" style="display: none;">
+        <h3 style="font-family: 'Source Code Pro', monospace; color: var(--blue-bright); letter-spacing: 0.1em; font-size: 2.2rem !important; margin: 0 0 1rem 0; text-transform: uppercase; text-shadow: var(--text-glow-bright); font-weight: 700; line-height: 1.2;" id="scramble-title">YOU WERE THE CHOSEN ONE. NOW PROVE IT</h3>
         <p style="font-size: 1rem !important; color: var(--text-muted); margin-bottom: 3.5rem; font-family: 'Source Code Pro', monospace; letter-spacing: 0.05em;" id="join-lobby-description">// ENTER ACCESS CODE TO JOIN //</p>
         
         <div class="form-group" style="margin-bottom: 2.5rem; width: 100%; display: flex; justify-content: center;">
@@ -60,7 +60,7 @@
       </div>
       
       <!-- Standby Logout Button -->
-      <div style="margin-top: auto; padding-top: 3rem; text-align: center; width: 100%;" id="standby-logout-container">
+      <div style="margin-top: 3rem; padding-top: 1rem; text-align: center; width: 100%;" id="standby-logout-container">
         <button class="btn btn-ghost btn-sm" id="btn-logout-standby" style="font-size: 0.75rem; letter-spacing: 0.1em; border-color: rgba(255, 0, 85, 0.2); color: #ff0055; text-shadow: 0 0 8px rgba(255, 0, 85, 0.25);">[ LOGOUT SESSION ]</button>
       </div>
     </div>

@@ -48,6 +48,39 @@
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
+  const updateSchedulePreview = () => {
+    const timeInput = $('#schedule-sim-time');
+    const previewText = $('#schedule-preview-text');
+    if (!timeInput || !previewText) return;
+    
+    const timeVal = timeInput.value;
+    if (!timeVal) {
+      previewText.textContent = '';
+      return;
+    }
+    
+    const selectedDate = new Date(timeVal);
+    const now = new Date();
+    const diffMs = selectedDate - now;
+    
+    if (diffMs <= 0) {
+      previewText.textContent = '(In the past!)';
+      previewText.style.color = '#ff0055';
+      previewText.style.textShadow = '0 0 5px rgba(255, 0, 85, 0.5)';
+    } else {
+      previewText.style.color = 'var(--blue-bright)';
+      previewText.style.textShadow = '0 0 5px var(--blue-bright)';
+      const diffMins = Math.ceil(diffMs / (60 * 1000));
+      if (diffMins < 60) {
+        previewText.textContent = `(Starts in ${diffMins}m)`;
+      } else {
+        const hrs = Math.floor(diffMins / 60);
+        const mins = diffMins % 60;
+        previewText.textContent = `(Starts in ${hrs}h ${mins}m)`;
+      }
+    }
+  };
+
   // ─── Toast ─────────────────────────────────────────────────
   function showToast(message, type = 'info') {
     const container = $('#toast-container');
@@ -178,15 +211,28 @@
         const timeInput = $('#schedule-sim-time');
         const cancelBtn = $('#btn-cancel-schedule-sim');
         const setBtn = $('#btn-schedule-sim');
+        
+        // Prevent selecting past dates in date picker
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        timeInput.setAttribute('min', `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`);
+        
         if (sim.scheduled_start_time) {
-          timeInput.value = formatDateTimeLocal(sim.scheduled_start_time);
+          if (document.activeElement !== timeInput) {
+            timeInput.value = formatDateTimeLocal(sim.scheduled_start_time);
+          }
           cancelBtn.style.display = 'inline-flex';
           setBtn.textContent = '[ UPDATE ]';
         } else {
-          timeInput.value = '';
+          if (document.activeElement !== timeInput && !timeInput.value) {
+            // Suggest 7 days in future by default
+            const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            timeInput.value = `${defaultDate.getFullYear()}-${pad(defaultDate.getMonth() + 1)}-${pad(defaultDate.getDate())}T${pad(defaultDate.getHours())}:${pad(defaultDate.getMinutes())}`;
+          }
           cancelBtn.style.display = 'none';
           setBtn.textContent = '[ SET ]';
         }
+        updateSchedulePreview();
       }
     }
   }
@@ -247,15 +293,28 @@
           const timeInput = $('#schedule-sim-time');
           const cancelBtn = $('#btn-cancel-schedule-sim');
           const setBtn = $('#btn-schedule-sim');
+          
+          // Prevent selecting past dates in date picker
+          const now = new Date();
+          const pad = (n) => String(n).padStart(2, '0');
+          timeInput.setAttribute('min', `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`);
+          
           if (simState.scheduled_start_time) {
-            timeInput.value = formatDateTimeLocal(simState.scheduled_start_time);
+            if (document.activeElement !== timeInput) {
+              timeInput.value = formatDateTimeLocal(simState.scheduled_start_time);
+            }
             cancelBtn.style.display = 'inline-flex';
             setBtn.textContent = '[ UPDATE ]';
           } else {
-            timeInput.value = '';
+            if (document.activeElement !== timeInput && !timeInput.value) {
+              // Suggest 7 days in future by default
+              const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+              timeInput.value = `${defaultDate.getFullYear()}-${pad(defaultDate.getMonth() + 1)}-${pad(defaultDate.getDate())}T${pad(defaultDate.getHours())}:${pad(defaultDate.getMinutes())}`;
+            }
             cancelBtn.style.display = 'none';
             setBtn.textContent = '[ SET ]';
           }
+          updateSchedulePreview();
         }
       }
     }
@@ -443,6 +502,13 @@
     else showToast(data.error, 'error');
   });
 
+  // Register live preview listeners on datetime input
+  const scheduleTimeInput = $('#schedule-sim-time');
+  if (scheduleTimeInput) {
+    scheduleTimeInput.addEventListener('input', updateSchedulePreview);
+    scheduleTimeInput.addEventListener('change', updateSchedulePreview);
+  }
+
   // Scheduling controls
   $('#btn-schedule-sim').addEventListener('click', async () => {
     if (!selectedSimId) return;
@@ -451,7 +517,12 @@
       showToast('SELECT A START DATE & TIME', 'warning');
       return;
     }
-    const startTime = new Date(timeVal).toISOString();
+    const selectedDate = new Date(timeVal);
+    if (selectedDate <= new Date()) {
+      showToast('SCHEDULED START TIME MUST BE IN THE FUTURE', 'warning');
+      return;
+    }
+    const startTime = selectedDate.toISOString();
 
     try {
       const res = await fetch(`/api/admin/simulation/${selectedSimId}/schedule`, {

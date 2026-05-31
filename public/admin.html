@@ -119,11 +119,12 @@
 
           <div class="sim-actions" style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center;">
             <button class="btn btn-success btn-lg" id="btn-start-sim" style="display:none;">[ START ]</button>
-            <div id="schedule-sim-container" style="display:none; align-items:center; gap:0.5rem; background:rgba(0,170,255,0.04); border:1px solid rgba(0,170,255,0.15); border-radius:4px; padding:0.4rem 0.6rem;">
+            <div id="schedule-sim-container" style="display:none; align-items:center; gap:0.5rem; background:rgba(0,170,255,0.04); border:1px solid rgba(0,170,255,0.15); border-radius:4px; padding:0.4rem 0.6rem; flex-wrap:wrap;">
               <span style="font-size:0.6rem; color:var(--text-muted); font-family:'Source Code Pro',monospace; text-transform:uppercase; white-space:nowrap;">SCHEDULE START:</span>
               <input type="datetime-local" id="schedule-sim-time" class="form-input" style="font-size:0.7rem; padding:0.2rem 0.4rem; max-width:200px; background:rgba(0,0,0,0.5); border-color:rgba(0,170,255,0.2); color:var(--text-primary);">
               <button class="btn btn-primary btn-sm" id="btn-schedule-sim" style="font-size:0.65rem; padding:0.35rem 0.6rem;">[ SET ]</button>
               <button class="btn btn-danger btn-sm" id="btn-cancel-schedule-sim" style="font-size:0.65rem; padding:0.35rem 0.6rem; display:none;">[ CANCEL ]</button>
+              <span id="schedule-preview-text" style="font-size:0.65rem; color:var(--blue-bright); font-family:'Source Code Pro',monospace; margin-left:0.5rem; white-space:nowrap; text-shadow:0 0 5px var(--blue-bright);"></span>
             </div>
             <button class="btn btn-amber btn-lg" id="btn-pause-sim" style="display:none;">[ PAUSE ]</button>
             <button class="btn btn-primary btn-lg" id="btn-resume-sim" style="display:none;">[ RESUME ]</button>

@@ -156,7 +156,7 @@
   }
 
   // --- Katakana Scrambler / Text Materializer Effect ---
-  const katakana = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const katakana = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*+-/<>{}[]_=|?^";
 
   function matrixMaterializeText(element, targetText, duration = 2000) {
     const chars = katakana.split('');
@@ -201,7 +201,7 @@
     }, 45);
   }
 
-  window.selectLobbySimulation = function(simId, name) {
+  function selectLobbySimulation(simId, name) {
     selectedLobbySimId = simId;
     selectedLobbySimName = name;
     
@@ -213,15 +213,25 @@
     $('#join-code-panel').style.display = 'flex';
     $('#join-lobby-description').textContent = `// ENTER ACCESS CODE TO JOIN "${name.toUpperCase()}" //`;
     
-    // Trigger matrix scrambler animation!
-    const titleElement = $('#scramble-title');
-    if (titleElement) {
-      matrixMaterializeText(titleElement, 'YOU WERE CHOSEN. NOW PROVE IT.', 2500);
-    }
-    
     // Focus the input
     inputJoinAccessCode.focus();
-  };
+
+    // Trigger matrix scrambler animation with a tiny layout-paint delay to guarantee visibility!
+    const titleElement = $('#scramble-title');
+    if (titleElement) {
+      // Instantly pre-fill with fully scrambled Katakana text so the user sees it immediately on paint!
+      const chars = katakana.split('');
+      titleElement.innerHTML = 'YOU WERE THE CHOSEN ONE. NOW PROVE IT'.split('').map(c => 
+        (c === ' ' || c === '.' || c === ',') ? c : `<span style="color: var(--blue-bright); text-shadow: 0 0 8px var(--blue-bright); font-weight: bold;">${chars[Math.floor(Math.random() * chars.length)]}</span>`
+      ).join('');
+
+      setTimeout(() => {
+        matrixMaterializeText(titleElement, 'YOU WERE THE CHOSEN ONE. NOW PROVE IT', 2000);
+      }, 60);
+    }
+  }
+  
+  window.selectLobbySimulation = selectLobbySimulation;
 
   async function loadLobbySimulations() {
     if (lobbyListTimerInterval) {

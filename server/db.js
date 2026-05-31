@@ -1,5 +1,13 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const bcrypt = require('bcryptjs');
+
+// OID 1114 is TIMESTAMP without timezone.
+types.setTypeParser(1114, function(stringValue) {
+  // Parse standard naive TIMESTAMP string from postgres as UTC!
+  // If we replace space with 'T' and append 'Z', Date parser treats it exactly as UTC!
+  const utcStr = stringValue.replace(' ', 'T') + 'Z';
+  return new Date(utcStr);
+});
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
