@@ -752,9 +752,14 @@ app.post('/api/participant/simulations/:simId/register', requireParticipant, asy
     if (!sim) return res.status(404).json({ error: 'Simulation not found' });
     if (sim.status !== 'not_started') return res.status(400).json({ error: 'Registration is closed — simulation has already started' });
 
+    // Register and instantly approve/enroll the participant
     await stmts.registerForSim(simId, req.session.userId);
+    await stmts.updateSimRegistration('approved', simId, req.session.userId);
+    await stmts.addParticipant(simId, req.session.userId, sim.starting_cash);
+    
     res.json({ success: true });
   } catch (err) {
+    console.error('Registration failed:', err);
     res.status(500).json({ error: 'Registration failed' });
   }
 });
