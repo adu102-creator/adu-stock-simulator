@@ -202,32 +202,60 @@
   }
 
   function selectLobbySimulation(simId, name) {
+    console.log('selectLobbySimulation called with:', simId, name);
     selectedLobbySimId = simId;
-    selectedLobbySimName = name;
+    selectedLobbySimName = name || 'Simulation';
     
-    // Clear code input
-    inputJoinAccessCode.value = '';
+    // Clear code input safely
+    if (inputJoinAccessCode) {
+      inputJoinAccessCode.value = '';
+    }
     
     // Hide list and show access panel as flex
-    $('#sim-list-container').style.display = 'none';
-    $('#join-code-panel').style.display = 'flex';
-    $('#join-lobby-description').textContent = `// ENTER ACCESS CODE TO JOIN "${name.toUpperCase()}" //`;
+    const simListContainer = $('#sim-list-container');
+    if (simListContainer) {
+      simListContainer.style.display = 'none';
+    }
     
-    // Focus the input
-    inputJoinAccessCode.focus();
+    const joinCodePanel = $('#join-code-panel');
+    if (joinCodePanel) {
+      joinCodePanel.style.display = 'flex';
+    }
+    
+    const safeName = (name || 'Simulation').toUpperCase();
+    const joinLobbyDescription = $('#join-lobby-description');
+    if (joinLobbyDescription) {
+      joinLobbyDescription.textContent = `// ENTER ACCESS CODE TO JOIN "${safeName}" //`;
+    }
+    
+    // Focus the input safely
+    if (inputJoinAccessCode) {
+      try {
+        inputJoinAccessCode.focus();
+      } catch (err) {
+        console.warn('Could not focus access code input:', err);
+      }
+    }
 
     // Trigger matrix scrambler animation with a tiny layout-paint delay to guarantee visibility!
     const titleElement = $('#scramble-title');
     if (titleElement) {
-      // Instantly pre-fill with fully scrambled Katakana text so the user sees it immediately on paint!
-      const chars = katakana.split('');
-      titleElement.innerHTML = 'YOU WERE THE CHOSEN ONE. NOW PROVE IT'.split('').map(c => 
-        (c === ' ' || c === '.' || c === ',') ? c : `<span style="color: var(--blue-bright); text-shadow: 0 0 8px var(--blue-bright); font-weight: bold;">${chars[Math.floor(Math.random() * chars.length)]}</span>`
-      ).join('');
+      try {
+        // Instantly pre-fill with fully scrambled Katakana text so the user sees it immediately on paint!
+        const chars = katakana.split('');
+        titleElement.innerHTML = 'YOU WERE THE CHOSEN ONE. NOW PROVE IT'.split('').map(c => 
+          (c === ' ' || c === '.' || c === ',') ? c : `<span style="color: var(--blue-bright); text-shadow: 0 0 8px var(--blue-bright); font-weight: bold;">${chars[Math.floor(Math.random() * chars.length)]}</span>`
+        ).join('');
 
-      setTimeout(() => {
-        matrixMaterializeText(titleElement, 'YOU WERE THE CHOSEN ONE. NOW PROVE IT', 2000);
-      }, 60);
+        setTimeout(() => {
+          if (titleElement) {
+            matrixMaterializeText(titleElement, 'YOU WERE THE CHOSEN ONE. NOW PROVE IT', 2000);
+          }
+        }, 60);
+      } catch (animErr) {
+        console.error('Scramble animation error:', animErr);
+        titleElement.textContent = 'YOU WERE THE CHOSEN ONE. NOW PROVE IT';
+      }
     }
   }
   
@@ -1492,9 +1520,13 @@
   // ═══ UTILITIES ═════════════════════════════════════════════
 
   function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str || '';
-    return div.innerHTML;
+    if (!str) return '';
+    return str.toString()
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   // ═══ INITIAL LOAD ══════════════════════════════════════════
