@@ -140,10 +140,6 @@ async function requireParticipant(req, res, next) {
   if (!req.session.userId || req.session.role !== 'participant') {
     return res.status(403).json({ error: 'Participant access required' });
   }
-  const user = await stmts.getUserById(req.session.userId);
-  if (!user || user.status !== 'approved') {
-    return res.status(403).json({ error: 'Account not approved yet' });
-  }
   next();
 }
 

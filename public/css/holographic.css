@@ -623,8 +623,11 @@ body.holo-environment .status-badge.not-started {
 
 /* ═══ MAIN TRADING INTERFACE LAYOUT ═══ */
 #trading-interface {
-  display: flex !important;
+  display: flex;
   flex-direction: column !important;
   min-height: 100vh !important;
   width: 100% !important;
+}
+#trading-interface[style*="display: none"] {
+  display: none !important;
 }

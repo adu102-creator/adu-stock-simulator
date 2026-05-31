@@ -186,19 +186,32 @@
   function updateUI(state) {
     simState = state;
 
+    const statusIndicator = $('#sim-status-indicator');
+
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+
     // Determine if we need to show the join code panel
     if (!state || !state.id) {
       // Case 1: No simulation active at all
-      $('#waiting-screen').style.display = 'flex';
-      $('#trading-interface').style.display = 'none';
-      $('#join-code-panel').style.display = 'none';
-      $('#waiting-title').textContent = 'AWAITING SIMULATION';
-      $('#waiting-message').textContent = '// No simulation is currently active. Standby for administrator launch.';
+      // We show the dashboard and let them browse archives freely, but disable trading
+      $('#waiting-screen').style.display = 'none';
+      showTrading();
+      
+      showStatusBanner('// NO ACTIVE SIMULATION — browse freely, trading disabled until admin starts a simulation.', 'idle');
+      statusIndicator.innerHTML = '<span class="status-badge not-started">[ STANDBY ]</span>';
+      $('#sim-name').textContent = '—';
+      $('#current-day').textContent = '—';
+      $('#day-progress-fill').style.width = '0%';
+      setTradingEnabled(false);
       return;
     }
 
     if (!state.isParticipant) {
-      // Case 2: A simulation exists, but user has not joined yet
+      // Case 2: A simulation exists, but user has not joined yet.
+      // In this case, we MUST restrict access and show the Access Code Join Form.
       $('#waiting-screen').style.display = 'flex';
       $('#trading-interface').style.display = 'none';
       $('#join-code-panel').style.display = 'block';
@@ -207,26 +220,27 @@
       return;
     }
 
-    // Case 3: Joined participant
+    // Case 3: Joined participant but simulation is not started yet (Lobby stage)
     if (state.status === 'not_started') {
-      $('#waiting-screen').style.display = 'flex';
-      $('#trading-interface').style.display = 'none';
-      $('#join-code-panel').style.display = 'none';
-      $('#waiting-title').textContent = 'JOINED LOBBY';
-      
+      // Let them browse the dashboard freely but disable trading, show thin banner at the top!
+      $('#waiting-screen').style.display = 'none';
+      showTrading();
+
+      $('#sim-name').textContent = state.name || '—';
+      $('#current-day').textContent = 'STANDBY';
+      $('#day-progress-fill').style.width = '0%';
+      statusIndicator.innerHTML = '<span class="status-badge not-started">[ STANDBY ]</span>';
+      setTradingEnabled(false);
+
       const scheduledTime = state.scheduled_start_time ? new Date(state.scheduled_start_time) : null;
       const now = new Date();
       if (scheduledTime && scheduledTime > now) {
-        if (countdownInterval) {
-          clearInterval(countdownInterval);
-          countdownInterval = null;
-        }
         const updateCountdown = () => {
           const t = scheduledTime - new Date();
           if (t <= 0) {
             clearInterval(countdownInterval);
             countdownInterval = null;
-            $('#waiting-message').textContent = '// SIMULATION IS PREPARING TO START... Awaiting launch from server.';
+            showStatusBanner('// SIMULATION IS PREPARING TO START... Awaiting launch from server.', 'idle');
             return;
           }
           const hours = Math.floor(t / (1000 * 60 * 60));
@@ -236,27 +250,20 @@
           const mm = mins.toString().padStart(2, '0');
           const ss = secs.toString().padStart(2, '0');
           
-          $('#waiting-message').textContent = `⏰ COUNTDOWN — Simulation starts automatically in: ${hh}:${mm}:${ss}`;
+          showStatusBanner(`⏰ COUNTDOWN — Simulation starts automatically in: ${hh}:${mm}:${ss}`, 'paused');
         };
         
         updateCountdown();
         countdownInterval = setInterval(updateCountdown, 1000);
       } else {
-        $('#waiting-message').textContent = `// SUCCESS: Registered for "${state.name}". Waiting for the admin to start the market. //`;
+        showStatusBanner(`// SUCCESS: Registered for "${state.name}". Waiting for the admin to start the market. //`, 'idle');
       }
       return;
     }
 
-    // If simulation is running, paused, or stopped, and they are a participant:
+    // Case 4: Running, Paused, or Stopped simulation (Joined participant)
+    $('#waiting-screen').style.display = 'none';
     showTrading();
-
-    const statusIndicator = $('#sim-status-indicator');
-    const statusBanner = $('#sim-status-banner');
-
-    if (countdownInterval) {
-      clearInterval(countdownInterval);
-      countdownInterval = null;
-    }
 
     if (state.status === 'paused') {
       showStatusBanner('// SIMULATION PAUSED — trading is temporarily disabled. Your data is preserved.', 'paused');

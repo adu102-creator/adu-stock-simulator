@@ -378,7 +378,7 @@ async function createUser(username, name, email, password, role = 'participant')
   return stmts.createUser({
     username, name, email, password_hash,
     role,
-    status: role === 'admin' ? 'approved' : 'pending',
+    status: 'approved',
   });
 }
 
