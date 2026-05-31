@@ -30,7 +30,7 @@ body.holo-environment::before {
 
 /* ─── Grid Overlay ─── */
 .holo-grid-overlay {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.08;
   background-image:
     linear-gradient(rgba(0, 229, 255, 0.25) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 229, 255, 0.25) 1px, transparent 1px);
