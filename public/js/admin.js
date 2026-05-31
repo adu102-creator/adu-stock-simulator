@@ -358,14 +358,17 @@
     } catch { showToast('REJECT FAILED', 'error'); }
   };
 
-  $('#btn-approve-all-regs').addEventListener('click', async () => {
-    if (!selectedSimId) return;
-    try {
-      await fetch(`/api/admin/simulations/${selectedSimId}/registrations/approve-all`, { method: 'POST' });
-      showToast('[ ALL APPROVED ]', 'success');
-      loadSimRegistrations(selectedSimId);
-    } catch { showToast('APPROVE ALL FAILED', 'error'); }
-  });
+  const btnApproveAll = $('#btn-approve-all-regs');
+  if (btnApproveAll) {
+    btnApproveAll.addEventListener('click', async () => {
+      if (!selectedSimId) return;
+      try {
+        await fetch(`/api/admin/simulations/${selectedSimId}/registrations/approve-all`, { method: 'POST' });
+        showToast('[ ALL APPROVED ]', 'success');
+        loadSimRegistrations(selectedSimId);
+      } catch { showToast('APPROVE ALL FAILED', 'error'); }
+    });
+  }
 
   // Create simulation
   $('#btn-create-sim').addEventListener('click', async () => {

@@ -586,6 +586,46 @@
     }
   });
 
+  // ═══ ARCHIVES MODAL ═════════════════════════════════════════
+
+  const archiveModal = $('#archive-modal');
+  const btnCloseArchiveModal = $('#btn-close-archive-modal');
+  const btnOpenArchivesStandby = $('#btn-open-archives-standby');
+  const btnOpenArchivesLobby = $('#btn-open-archives-lobby');
+
+  const openArchiveModal = () => {
+    archiveModal.classList.add('active');
+    archiveModal.style.display = 'flex';
+    const modalReportViewer = $('#modal-report-viewer');
+    if (modalReportViewer) modalReportViewer.style.display = 'none';
+    loadArchives(true);
+  };
+
+  const closeArchiveModal = () => {
+    archiveModal.classList.remove('active');
+    archiveModal.style.display = 'none';
+  };
+
+  if (btnCloseArchiveModal) {
+    btnCloseArchiveModal.addEventListener('click', closeArchiveModal);
+  }
+
+  if (btnOpenArchivesStandby) {
+    btnOpenArchivesStandby.addEventListener('click', openArchiveModal);
+  }
+
+  if (btnOpenArchivesLobby) {
+    btnOpenArchivesLobby.addEventListener('click', openArchiveModal);
+  }
+
+  if (archiveModal) {
+    archiveModal.addEventListener('click', (e) => {
+      if (e.target === archiveModal) {
+        closeArchiveModal();
+      }
+    });
+  }
+
   window.openStockModal = async function(stockId) {
     selectedStock = stockData[stockId];
     if (!selectedStock) return;
@@ -1122,16 +1162,17 @@
 
   // ═══ ARCHIVES & LEARNING REPORTS ═══════════════════════════
 
-  async function loadArchives() {
+  async function loadArchives(isModal = false) {
     try {
       const res = await fetch('/api/participant/archives');
       const archives = await res.json();
-      renderArchiveList(archives);
+      renderArchiveList(archives, isModal);
     } catch { }
   }
 
-  function renderArchiveList(archives) {
-    const container = $('#participant-archive-list');
+  function renderArchiveList(archives, isModal = false) {
+    const container = isModal ? $('#modal-archive-list') : $('#participant-archive-list');
+    if (!container) return;
     if (archives.length === 0) {
       container.innerHTML = '<div class="empty-state"><p>// no archived simulations</p></div>';
       return;
@@ -1145,21 +1186,24 @@
         </div>
         <div class="sim-card-actions">
           <span class="status-badge archived"><span class="status-dot"></span>[ ARCHIVED ]</span>
-          <button class="btn btn-ghost btn-sm" onclick="viewArchiveLeaderboard(${s.id})">[ RANKINGS ]</button>
-          ${s.reportVisible ? `<button class="btn btn-primary btn-sm" onclick="viewLearningReport(${s.id})">[ AI REPORT ]</button>` : '<span style="font-size:0.6rem;color:var(--text-muted);">// report locked</span>'}
+          <button class="btn btn-ghost btn-sm" onclick="viewArchiveLeaderboard(${s.id}, ${isModal})">[ RANKINGS ]</button>
+          ${s.reportVisible ? `<button class="btn btn-primary btn-sm" onclick="viewLearningReport(${s.id}, ${isModal})">[ AI REPORT ]</button>` : '<span style="font-size:0.6rem;color:var(--text-muted);">// report locked</span>'}
         </div>
       </div>
     `).join('');
   }
 
-  window.viewArchiveLeaderboard = async function(simId) {
+  window.viewArchiveLeaderboard = async function(simId, isModal = false) {
     try {
       const res = await fetch(`/api/participant/archives/${simId}/leaderboard`);
       const data = await res.json();
 
-      const reportViewer = $('#report-viewer');
+      const reportViewer = isModal ? $('#modal-report-viewer') : $('#report-viewer');
+      const reportTitle = isModal ? $('#modal-report-title') : $('#report-title');
+      const reportContent = isModal ? $('#modal-report-content') : $('#report-content');
+
       reportViewer.style.display = 'block';
-      $('#report-title').textContent = '// FINAL RANKINGS';
+      reportTitle.textContent = '// FINAL RANKINGS';
 
       let html = '<div class="glass-card"><table class="leaderboard-table"><thead><tr><th>RANK</th><th>PARTICIPANT</th><th>TOTAL VALUE</th></tr></thead><tbody>';
       html += data.map(p => {
@@ -1173,11 +1217,11 @@
       }).join('');
       html += '</tbody></table></div>';
 
-      $('#report-content').innerHTML = html;
+      reportContent.innerHTML = html;
     } catch { showToast('FAILED TO LOAD', 'error'); }
   };
 
-  window.viewLearningReport = async function(simId) {
+  window.viewLearningReport = async function(simId, isModal = false) {
     try {
       const res = await fetch(`/api/participant/archives/${simId}/report`);
       if (!res.ok) {
@@ -1187,9 +1231,12 @@
       }
       const data = await res.json();
 
-      const reportViewer = $('#report-viewer');
+      const reportViewer = isModal ? $('#modal-report-viewer') : $('#report-viewer');
+      const reportTitle = isModal ? $('#modal-report-title') : $('#report-title');
+      const reportContent = isModal ? $('#modal-report-content') : $('#report-content');
+
       reportViewer.style.display = 'block';
-      $('#report-title').textContent = `// AI LEARNING REPORT — ${data.simulation.name}`;
+      reportTitle.textContent = `// AI LEARNING REPORT — ${data.simulation.name}`;
 
       let html = '';
       html += `<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:1rem;padding:0.5rem;border:1px solid var(--blue-border);background:var(--bg-panel);">// This report reveals the AI reasoning behind each news event. Study causal chains and optimal actions to improve your trading strategy.</div>`;
@@ -1240,7 +1287,7 @@
       });
       html += '</tbody></table></div>';
 
-      $('#report-content').innerHTML = html;
+      reportContent.innerHTML = html;
     } catch (err) {
       showToast('FAILED TO LOAD REPORT', 'error');
       console.error(err);

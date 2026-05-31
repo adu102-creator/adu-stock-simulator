@@ -907,16 +907,10 @@ app.get('/api/participant/leaderboard', requireParticipant, async (req, res) => 
 app.get('/api/participant/archives', requireParticipant, async (req, res) => {
   try {
     const archivedSims = await stmts.getArchivedSimulations();
-    const userSims = [];
-    for (const sim of archivedSims) {
-      const sp = await stmts.getParticipant(sim.id, req.session.userId);
-      if (sp) {
-        userSims.push({
-          ...sim,
-          reportVisible: sp.report_visible
-        });
-      }
-    }
+    const userSims = archivedSims.map(sim => ({
+      ...sim,
+      reportVisible: sim.report_released === 1
+    }));
     res.json(userSims);
   } catch (error) {
     console.error('Archive load error:', error);
@@ -929,10 +923,7 @@ app.get('/api/participant/archives/:simId/report', requireParticipant, async (re
     const simId = parseInt(req.params.simId);
     const sim = await stmts.getSimulation(simId);
     if (!sim || sim.status !== 'stopped') return res.status(404).json({ error: 'Archive not found' });
-
-    const sp = await stmts.getParticipant(simId, req.session.userId);
-    if (!sp) return res.status(403).json({ error: 'You were not part of this simulation' });
-    if (!sp.report_visible) return res.status(403).json({ error: 'Report not yet released by admin' });
+    if (sim.report_released !== 1) return res.status(403).json({ error: 'Report not yet released by admin' });
 
     const allNews = await stmts.getAllSimNews(simId);
     const stocks = await stmts.getSimStocks(simId);
@@ -957,8 +948,6 @@ app.get('/api/participant/archives/:simId/report', requireParticipant, async (re
 app.get('/api/participant/archives/:simId/leaderboard', requireParticipant, async (req, res) => {
   try {
     const simId = parseInt(req.params.simId);
-    const sp = await stmts.getParticipant(simId, req.session.userId);
-    if (!sp) return res.status(403).json({ error: 'Not part of this simulation' });
     res.json(await getLeaderboard(simId));
   } catch (error) {
     console.error('Leaderboard load error:', error);
