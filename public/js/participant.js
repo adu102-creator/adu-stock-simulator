@@ -41,6 +41,7 @@
   let stockData = {};
   let portfolio = { cash: 0, holdings: [], trades: [] };
   let selectedStock = null;
+  let isCurrentlyJoined = false;
   let priceChart = null;
   let newsList = [];
   let lastRank = null; // Track leaderboard position for change popups
@@ -206,9 +207,10 @@
       
       element.innerHTML = currentText.map((char, index) => {
         if (resolved[index]) {
+          if (char === ' ') return ' ';
           return `<span style="color: #ffffff; text-shadow: var(--text-glow-bright);">${char}</span>`;
         } else {
-          return `<span style="color: var(--blue-bright); text-shadow: 0 0 8px var(--blue-bright); font-weight: bold;">${char}</span>`;
+          return `<span style="color: var(--blue-bright); text-shadow: 0 0 8px var(--blue-bright);">${char}</span>`;
         }
       }).join('');
       
@@ -217,7 +219,7 @@
         element.matrixInterval = null;
         element.innerHTML = targetChars.map(char => `<span style="color: #ffffff; text-shadow: var(--text-glow-bright);">${char}</span>`).join('');
       }
-    }, 45);
+    }, 80);
   }
 
   function selectLobbySimulation(simId, name) {
@@ -263,14 +265,14 @@
         // Instantly pre-fill with fully scrambled Katakana text so the user sees it immediately on paint!
         const chars = katakana.split('');
         titleElement.innerHTML = 'YOU WERE THE CHOSEN ONE. NOW PROVE IT'.split('').map(c => 
-          (c === ' ' || c === '.' || c === ',') ? c : `<span style="color: var(--blue-bright); text-shadow: 0 0 8px var(--blue-bright); font-weight: bold;">${chars[Math.floor(Math.random() * chars.length)]}</span>`
+          (c === ' ' || c === '.' || c === ',') ? c : `<span style="color: var(--blue-bright); text-shadow: 0 0 8px var(--blue-bright);">${chars[Math.floor(Math.random() * chars.length)]}</span>`
         ).join('');
 
         setTimeout(() => {
           if (titleElement) {
             matrixMaterializeText(titleElement, 'YOU WERE THE CHOSEN ONE. NOW PROVE IT', 3500);
           }
-        }, 60);
+        }, 100);
       } catch (animErr) {
         console.error('Scramble animation error:', animErr);
         titleElement.textContent = 'YOU WERE THE CHOSEN ONE. NOW PROVE IT';
@@ -458,6 +460,20 @@
     if (countdownInterval) {
       clearInterval(countdownInterval);
       countdownInterval = null;
+    }
+
+    if (state && state.id) {
+      if (state.isParticipant !== undefined) {
+        if (state.isParticipant) {
+          isCurrentlyJoined = true;
+        } else {
+          isCurrentlyJoined = false;
+        }
+      } else if (isCurrentlyJoined) {
+        state.isParticipant = true;
+      }
+    } else {
+      isCurrentlyJoined = false;
     }
 
     // Case 1 & Case 2: No active simulation OR exists but user has not joined yet

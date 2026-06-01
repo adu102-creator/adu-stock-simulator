@@ -21,6 +21,7 @@
     "express-session": "^1.18.1",
     "helmet": "^8.2.0",
     "pg": "^8.21.0",
+    "puppeteer-core": "^24.43.1",
     "socket.io": "^4.8.1"
   }
 }
